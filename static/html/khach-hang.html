@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Khách hàng | Quản lý rạp chiếu phim</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <link rel="stylesheet" href="../css/rap-chieu-phim.css">
+  </head>
+  <body class="app-layout">
+    <header class="app-header d-flex align-items-center justify-content-between gap-3">
+      <a class="brand" href="dang-nhap.html"><span aria-hidden="true">▶</span> Quản lý rạp chiếu phim</a>
+      <a class="header-link" href="dang-nhap.html">Tài khoản</a>
+    </header>
+    <nav class="sidebar" aria-label="Điều hướng chính">
+      <ul class="menu-list">
+        <li><a href="dang-nhap.html">Đăng nhập</a></li>
+        <li><span aria-disabled="true">Phim</span></li>
+        <li><span aria-disabled="true">Phòng chiếu và ghế</span></li>
+        <li><span aria-disabled="true">Suất chiếu</span></li>
+        <li><span aria-disabled="true">Bán vé</span></li>
+        <li><a href="khach-hang.html" aria-current="page">Khách hàng</a></li>
+        <li><span aria-disabled="true">Bắp nước và hóa đơn</span></li>
+        <li><span aria-disabled="true">Thống kê</span></li>
+      </ul>
+    </nav>
+    <main class="main-content">
+      <h1>Khách hàng</h1>
+      <p class="page-description">Tra cứu thông tin và lịch sử mua vé của khách hàng.</p>
+      <div class="customer-layout">
+        <section class="panel" aria-labelledby="customers-title">
+          <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+            <h2 id="customers-title" class="mb-0">Danh sách khách hàng</h2>
+            <span id="customer-count" class="text-secondary small" role="status"></span>
+          </div>
+          <div class="table-responsive">
+            <table class="table align-middle customer-table mb-0" aria-labelledby="customers-title">
+              <thead>
+                <tr>
+                  <th scope="col">Mã KH</th>
+                  <th scope="col">Họ và tên</th>
+                  <th scope="col">Số điện thoại</th>
+                  <th scope="col">Email</th>
+                </tr>
+              </thead>
+              <tbody id="customer-rows">
+                <tr><td colspan="4">Cần tải jQuery để xem dữ liệu mẫu.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <div class="detail-stack">
+          <section class="panel" aria-labelledby="detail-title">
+            <h2 id="detail-title">Thông tin khách hàng</h2>
+            <form id="customer-form" class="form-stack">
+              <label class="form-label" for="customer-id">Mã khách hàng</label>
+              <input class="form-control" id="customer-id" name="MaKhachHang" type="text" maxlength="10" required>
+              <label class="form-label" for="customer-name">Họ và tên</label>
+              <input class="form-control" id="customer-name" name="TenKhachHang" type="text" maxlength="100" required>
+              <label class="form-label" for="customer-phone">Số điện thoại</label>
+              <input class="form-control" id="customer-phone" name="SoDienThoai" type="tel" maxlength="15" required>
+              <label class="form-label" for="customer-email">Email</label>
+              <input class="form-control" id="customer-email" name="Email" type="email" maxlength="100">
+              <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-dark" type="submit" name="ThaoTac" value="them" disabled>Thêm</button>
+                <button class="btn btn-outline-dark" type="submit" name="ThaoTac" value="sua" disabled>Sửa</button>
+                <button class="btn btn-outline-dark" id="delete-customer" type="button" disabled>Xóa</button>
+                <button class="btn btn-outline-secondary" id="clear-customer" type="button" disabled>Làm mới</button>
+              </div>
+              <p class="form-message" id="customer-message" role="status"></p>
+            </form>
+          </section>
+          <section class="panel" aria-labelledby="search-title">
+            <h2 id="search-title">Tìm kiếm</h2>
+            <label class="visually-hidden" for="customer-search">Mã, tên, số điện thoại hoặc email</label>
+            <input class="form-control" type="search" id="customer-search" placeholder="Mã, tên, số điện thoại hoặc email" disabled>
+          </section>
+          <section class="panel" aria-labelledby="history-title">
+            <h2 id="history-title">Lịch sử mua vé</h2>
+            <div class="table-responsive">
+              <table class="table align-middle mb-0" aria-labelledby="history-title">
+                <thead>
+                  <tr>
+                    <th scope="col">Mã vé</th>
+                    <th scope="col">Phim</th>
+                    <th scope="col">Ngày đặt</th>
+                  </tr>
+                </thead>
+                <tbody id="ticket-rows">
+                  <tr><td colspan="3">Chọn một khách hàng để xem lịch sử.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="../js/khach-hang.js"></script>
+  </body>
+</html>

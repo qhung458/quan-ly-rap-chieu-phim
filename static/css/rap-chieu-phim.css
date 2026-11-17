@@ -1,0 +1,250 @@
+body {
+  background: #f4f5f7;
+  color: #202631;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.app-header {
+  grid-column: 1 / -1;
+  min-height: 64px;
+  padding: 0.75rem 1.5rem;
+  background: #fff;
+  border-bottom: 1px solid #dce0e5;
+}
+
+.brand,
+.header-link {
+  color: #202631;
+  text-decoration: none;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 700;
+}
+
+.brand span,
+.cinema-logo {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: #262c36;
+}
+
+.brand span {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+}
+
+.header-link {
+  font-size: 0.875rem;
+}
+
+.header-link:hover,
+.auth-link a:hover {
+  text-decoration: underline;
+}
+
+.app-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  padding: 1.5rem 0.75rem;
+  background: #fff;
+  border-right: 1px solid #dce0e5;
+}
+
+.menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.menu-list a,
+.menu-list span {
+  display: block;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  color: #414957;
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.menu-list a[aria-current="page"],
+.menu-list a:hover {
+  background: #e9ecf0;
+  color: #202631;
+}
+
+.menu-list a[aria-current="page"] {
+  font-weight: 700;
+}
+
+.menu-list span {
+  color: #646c79;
+}
+
+.main-content {
+  width: 100%;
+  max-width: 1520px;
+  padding: clamp(1rem, 3vw, 2.25rem);
+}
+
+h1 {
+  margin-bottom: 0.35rem;
+  font-size: clamp(1.65rem, 3vw, 2.15rem);
+  font-weight: 700;
+}
+
+h2 {
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.page-description {
+  margin-bottom: 1.5rem;
+  color: #505a69;
+}
+
+.panel {
+  min-width: 0;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  border: 1px solid #dce0e5;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.auth-grid,
+.customer-layout {
+  display: grid;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.auth-grid {
+  max-width: 960px;
+  align-items: stretch;
+}
+
+.cinema-logo {
+  width: 90px;
+  height: 65px;
+  margin: 0 auto 1.25rem;
+  border-radius: 12px;
+  font-size: 1.35rem;
+}
+
+.detail-stack {
+  display: grid;
+  gap: 0.85rem;
+  align-content: start;
+}
+
+.form-stack > .form-control,
+.form-stack > .form-select {
+  margin-bottom: 0.85rem;
+}
+
+.form-stack > .btn {
+  width: 100%;
+}
+
+.form-label {
+  margin-bottom: 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.form-message {
+  margin: 0.85rem 0 0;
+  font-size: 0.875rem;
+}
+
+.form-message:empty {
+  display: none;
+}
+
+.auth-link,
+.library-notice {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}
+
+.auth-link a {
+  color: #303f58;
+}
+
+.table {
+  font-size: 0.875rem;
+}
+
+.table th {
+  white-space: nowrap;
+}
+
+.table thead th {
+  --bs-table-bg: #f1f3f5;
+  color: #414957;
+}
+
+.customer-table td,
+.customer-table th {
+  padding-block: 0.7rem;
+}
+
+.customer-table tr.is-selected td {
+  --bs-table-bg: #e9edf4;
+}
+
+.customer-selector {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #314766;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+
+@media (min-width: 768px) {
+  .auth-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .customer-layout {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  }
+}
+
+@media (max-width: 767.98px) {
+  .app-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
+  }
+
+  .sidebar {
+    overflow-x: auto;
+    padding: 0.75rem;
+    border-right: 0;
+    border-bottom: 1px solid #dce0e5;
+  }
+
+  .menu-list {
+    flex-direction: row;
+    white-space: nowrap;
+  }
+}

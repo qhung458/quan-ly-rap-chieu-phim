@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Đăng nhập | Quản lý rạp chiếu phim</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <link rel="stylesheet" href="../css/rap-chieu-phim.css">
+  </head>
+  <body class="app-layout">
+    <header class="app-header d-flex align-items-center justify-content-between gap-3">
+      <a class="brand" href="dang-nhap.html"><span aria-hidden="true">▶</span> Quản lý rạp chiếu phim</a>
+      <a class="header-link" href="dang-nhap.html">Tài khoản</a>
+    </header>
+    <nav class="sidebar" aria-label="Điều hướng chính">
+      <ul class="menu-list">
+        <li><a href="dang-nhap.html" aria-current="page">Đăng nhập</a></li>
+        <li><span aria-disabled="true">Phim</span></li>
+        <li><span aria-disabled="true">Phòng chiếu và ghế</span></li>
+        <li><span aria-disabled="true">Suất chiếu</span></li>
+        <li><span aria-disabled="true">Bán vé</span></li>
+        <li><a href="khach-hang.html">Khách hàng</a></li>
+        <li><span aria-disabled="true">Bắp nước và hóa đơn</span></li>
+        <li><span aria-disabled="true">Thống kê</span></li>
+      </ul>
+    </nav>
+    <main class="main-content">
+      <h1>Đăng nhập</h1>
+      <p class="page-description">Dành cho nhân viên quầy và quản trị viên.</p>
+      <div class="auth-grid">
+        <section class="panel" aria-labelledby="login-title">
+          <div class="cinema-logo" aria-hidden="true">▶</div>
+          <h2 id="login-title">Đăng nhập</h2>
+          <form id="login-form" method="post" class="form-stack">
+            <label class="form-label" for="login-name">Tên đăng nhập</label>
+            <input class="form-control" id="login-name" name="TenDangNhap" type="text" autocomplete="username" required>
+            <label class="form-label" for="login-password">Mật khẩu</label>
+            <input class="form-control" id="login-password" name="MatKhau" type="password" autocomplete="current-password" required>
+            <button class="btn btn-dark" type="submit" disabled>Đăng nhập</button>
+            <p class="form-message" role="status"></p>
+          </form>
+        </section>
+        <section class="panel" aria-labelledby="register-title">
+          <h2 id="register-title">Đăng ký</h2>
+          <form id="register-form" method="post" class="form-stack">
+            <label class="form-label" for="register-fullname">Họ và tên</label>
+            <input class="form-control" id="register-fullname" name="HoTen" type="text" autocomplete="name" required>
+            <label class="form-label" for="register-name">Tên đăng nhập</label>
+            <input class="form-control" id="register-name" name="TenDangNhap" type="text" autocomplete="username" required>
+            <label class="form-label" for="register-password">Mật khẩu</label>
+            <input class="form-control" id="register-password" name="MatKhau" type="password" autocomplete="new-password" required>
+            <label class="form-label" for="register-confirm">Nhập lại mật khẩu</label>
+            <input class="form-control" id="register-confirm" name="XacNhanMatKhau" type="password" autocomplete="new-password" required>
+            <label class="form-label" for="register-role">Vai trò</label>
+            <select class="form-select" id="register-role" name="VaiTro" required>
+              <option value="">Chọn vai trò</option>
+              <option value="NhanVien">Nhân viên quầy</option>
+              <option value="QuanTriVien">Quản trị viên</option>
+            </select>
+            <button class="btn btn-dark" type="submit" disabled>Đăng ký</button>
+            <p class="form-message" role="status"></p>
+          </form>
+          <p class="auth-link mb-0">Đã có tài khoản? <a id="login-link" href="#login-name">Đăng nhập ngay</a></p>
+        </section>
+      </div>
+      <p class="library-notice" role="status">Cần tải jQuery để sử dụng biểu mẫu.</p>
+    </main>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="../js/dang-nhap.js"></script>
+  </body>
+</html>

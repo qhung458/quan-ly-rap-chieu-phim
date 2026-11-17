@@ -1,0 +1,40 @@
+-- t25
+DROP FUNCTION IF EXISTS fn_SoGheTrong;
+
+DELIMITER $$
+
+CREATE FUNCTION fn_SoGheTrong(p_MaSuatChieu VARCHAR(20))
+RETURNS INT
+READS SQL DATA
+BEGIN
+    DECLARE v_MaPhong VARCHAR(10);
+    DECLARE v_SoGheTrong INT DEFAULT 0;
+
+    SELECT MAX(sc.MaPhong)
+    INTO v_MaPhong
+    FROM SuatChieu sc
+    WHERE sc.MaSuatChieu = p_MaSuatChieu;
+
+    -- NULL: suất chiếu không tồn tại.
+    IF v_MaPhong IS NULL THEN
+        RETURN NULL;
+    END IF;
+
+    SELECT COUNT(*)
+    INTO v_SoGheTrong
+    FROM Ghe g
+    WHERE g.MaPhong = v_MaPhong
+      AND g.TrangThai <> 'BaoTri'
+      AND NOT EXISTS (
+          SELECT 1
+          FROM Ve v
+          WHERE v.MaSuatChieu = p_MaSuatChieu
+            AND v.MaGhe = g.MaGhe
+            AND v.TrangThai IN ('DaDat', 'DaSuDung')
+      );
+
+    RETURN v_SoGheTrong;
+END $$
+
+DELIMITER ;
+
