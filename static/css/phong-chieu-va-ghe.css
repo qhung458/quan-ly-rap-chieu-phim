@@ -1,0 +1,66 @@
+.room-seat-layout,
+.room-seat-layout .detail-stack {
+  display: grid;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.room-seat-fields {
+  display: grid;
+  grid-template-columns: minmax(5.25rem, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65rem 0.75rem;
+}
+
+.room-seat-fields .form-label {
+  margin-bottom: 0;
+}
+
+.room-seat-fields .form-control[readonly] {
+  background: #f4f5f7;
+}
+
+.room-table td,
+.room-table th {
+  padding-block: 0.6rem;
+  white-space: nowrap;
+}
+
+.room-table tr[data-room-id],
+.room-table tr[data-seat-id] {
+  cursor: pointer;
+}
+
+.room-table tr.is-selected td {
+  --bs-table-bg: #e9edf4;
+}
+
+.room-selector,
+.seat-selector {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #314766;
+  font-size: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+
+@media (min-width: 1200px) {
+  .room-seat-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .room-seat-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.35rem;
+  }
+
+  .room-seat-fields .form-label:not(:first-child) {
+    margin-top: 0.35rem;
+  }
+}
