@@ -1,4 +1,4 @@
--- đạt
+-- Doanh thu ve theo ngay chieu. Loai ve huy va suat huy.
 
 SET @TuNgay = '2026-11-05';
 SET @DenNgay = '2026-11-06';
@@ -13,6 +13,7 @@ SELECT
 FROM Phim AS p
 LEFT JOIN SuatChieu AS sc
     ON sc.MaPhim = p.MaPhim
+    AND sc.TrangThai <> 'Huy'
     AND sc.NgayChieu >= @TuNgay
     AND sc.NgayChieu < DATE_ADD(@DenNgay, INTERVAL 1 DAY)
 LEFT JOIN Ve AS v
@@ -40,6 +41,7 @@ LEFT JOIN Ve v
     ON v.MaSuatChieu = sc.MaSuatChieu
    AND v.TrangThai IN ('DaDat', 'DaSuDung')
 WHERE sc.NgayChieu >= @TuNgay
+  AND sc.TrangThai <> 'Huy'
   AND sc.NgayChieu < DATE_ADD(@DenNgay, INTERVAL 1 DAY)
 GROUP BY sc.NgayChieu
 ORDER BY sc.NgayChieu;
@@ -56,6 +58,7 @@ LEFT JOIN Ve v
     ON v.MaSuatChieu = sc.MaSuatChieu
    AND v.TrangThai IN ('DaDat', 'DaSuDung')
 WHERE sc.NgayChieu >= @TuNgay
+  AND sc.TrangThai <> 'Huy'
   AND sc.NgayChieu < DATE_ADD(@DenNgay, INTERVAL 1 DAY)
 GROUP BY YEAR(sc.NgayChieu), MONTH(sc.NgayChieu)
 ORDER BY Nam, Thang;
@@ -72,4 +75,5 @@ LEFT JOIN Ve v
     ON v.MaSuatChieu = sc.MaSuatChieu
    AND v.TrangThai IN ('DaDat', 'DaSuDung')
 WHERE sc.NgayChieu >= @TuNgay
+  AND sc.TrangThai <> 'Huy'
   AND sc.NgayChieu < DATE_ADD(@DenNgay, INTERVAL 1 DAY);

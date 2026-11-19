@@ -1,5 +1,4 @@
--- MySQL 8.0.16+. Nap seed lich su truoc file nay.
--- Ve DaDat/DaSuDung chiem ghe; DaHuy khong chiem ghe.
+-- MySQL 8.0.16+. Nap du lieu lich su truoc khi cai trigger.
 CREATE TABLE IF NOT EXISTS CauHinhHeThong (
     TenThamSo VARCHAR(50) PRIMARY KEY,
     GiaTri INT NOT NULL,
@@ -7,89 +6,224 @@ CREATE TABLE IF NOT EXISTS CauHinhHeThong (
     CHECK (GiaTri >= 0)
 );
 INSERT INTO CauHinhHeThong (TenThamSo, GiaTri, MoTa) VALUES
-('PHUT_NGUNG_BAN', 5, 'Ngung ban/doi ve khi con duoi 5 phut'),
-('PHUT_NGUNG_HUY', 60, 'Ngung huy ve khi con duoi 60 phut')
-ON DUPLICATE KEY UPDATE GiaTri = VALUES(GiaTri), MoTa = VALUES(MoTa);
+('PHUT_NGUNG_BAN', 5, 'Ngung ban ve khi con duoi 5 phut'),
+('PHUT_NGUNG_HUY', 60, 'Ngung huy/doi ve khi con duoi 60 phut')
+ON DUPLICATE KEY UPDATE TenThamSo = CauHinhHeThong.TenThamSo;
 
 DELIMITER //
 DROP TRIGGER IF EXISTS trg_Ve_BeforeInsert //
-CREATE TRIGGER trg_Ve_BeforeInsert
-BEFORE INSERT ON Ve FOR EACH ROW
+DROP TRIGGER IF EXISTS trg_Ve_BeforeUpdate //
+DROP TRIGGER IF EXISTS trg_Ghe_BeforeUpdate //
+DROP TRIGGER IF EXISTS trg_GheBaoTri_BeforeInsert //
+DROP TRIGGER IF EXISTS trg_GheBaoTri_BeforeUpdate //
+DROP TRIGGER IF EXISTS trg_SuatChieu_BeforeInsert //
+DROP TRIGGER IF EXISTS trg_SuatChieu_BeforeUpdate //
+DROP PROCEDURE IF EXISTS usp_KiemTraDatVe //
+DROP PROCEDURE IF EXISTS usp_KiemTraBaoTriGhe //
+DROP PROCEDURE IF EXISTS usp_KiemTraLichPhong //
+
+CREATE PROCEDURE usp_KiemTraDatVe(
+    IN p_MaSuatChieu VARCHAR(20),
+    IN p_MaGhe VARCHAR(15)
+)
 BEGIN
-    DECLARE v_PhutBan INT DEFAULT 5;
-    DECLARE v_NgayGioChieu DATETIME;
     DECLARE v_PhongSuat VARCHAR(10);
     DECLARE v_PhongGhe VARCHAR(10);
-    DECLARE v_TrangThaiGhe VARCHAR(20);
-    SELECT MAX(MaPhong), MAX(TIMESTAMP(NgayChieu, GioBatDau))
-      INTO v_PhongSuat, v_NgayGioChieu
-      FROM SuatChieu WHERE MaSuatChieu = NEW.MaSuatChieu;
-    SELECT MAX(MaPhong), MAX(TrangThai) INTO v_PhongGhe, v_TrangThaiGhe
-      FROM Ghe WHERE MaGhe = NEW.MaGhe;
+    DECLARE v_TrangThaiSuat VARCHAR(20);
+    DECLARE v_BatDau DATETIME;
+    DECLARE v_PhutBan INT;
+
+    SELECT MaPhong, TrangThai, TIMESTAMP(NgayChieu, GioBatDau)
+      INTO v_PhongSuat, v_TrangThaiSuat, v_BatDau
+      FROM SuatChieu WHERE MaSuatChieu = p_MaSuatChieu FOR SHARE;
+    SELECT MaPhong INTO v_PhongGhe
+      FROM Ghe WHERE MaGhe = p_MaGhe FOR SHARE;
+
     IF v_PhongSuat IS NULL OR v_PhongGhe IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Suat chieu hoac ghe khong ton tai.';
     END IF;
     IF v_PhongSuat <> v_PhongGhe THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ghe khong thuoc phong cua suat chieu.';
     END IF;
-    IF NEW.TrangThai IN ('DaDat', 'DaSuDung') THEN
-        IF v_TrangThaiGhe = 'BaoTri' THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong the ban ve cho ghe bao tri.';
-        END IF;
-        SELECT COALESCE(MAX(GiaTri), 5) INTO v_PhutBan
-          FROM CauHinhHeThong WHERE TenThamSo = 'PHUT_NGUNG_BAN';
-        IF v_NgayGioChieu < DATE_ADD(NOW(), INTERVAL v_PhutBan MINUTE) THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong the dat ve: suat chieu da ngung ban.';
-        END IF;
+    IF v_TrangThaiSuat <> 'SapChieu' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Suat chieu khong mo ban ve.';
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM GheBaoTri WHERE MaGhe = p_MaGhe AND MaPhong = v_PhongGhe FOR SHARE
+    ) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong the dat ghe dang bao tri.';
+    END IF;
+
+    SELECT COALESCE(MAX(GiaTri), 5) INTO v_PhutBan
+      FROM CauHinhHeThong WHERE TenThamSo = 'PHUT_NGUNG_BAN';
+    IF v_BatDau <= NOW() OR v_BatDau < DATE_ADD(NOW(), INTERVAL v_PhutBan MINUTE) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Suat chieu da qua han ban ve.';
     END IF;
 END //
 
-DROP TRIGGER IF EXISTS trg_Ve_BeforeUpdate //
+CREATE TRIGGER trg_Ve_BeforeInsert
+BEFORE INSERT ON Ve FOR EACH ROW
+BEGIN
+    IF NEW.TrangThai <> 'DaDat' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ve moi phai co trang thai DaDat.';
+    END IF;
+    CALL usp_KiemTraDatVe(NEW.MaSuatChieu, NEW.MaGhe);
+END //
+
 CREATE TRIGGER trg_Ve_BeforeUpdate
 BEFORE UPDATE ON Ve FOR EACH ROW
 BEGIN
-    DECLARE v_PhutBan INT DEFAULT 5;
-    DECLARE v_PhutHuy INT DEFAULT 60;
-    DECLARE v_NgayGioChieu DATETIME;
-    DECLARE v_NgayGioCu DATETIME;
-    DECLARE v_PhongSuat VARCHAR(10);
-    DECLARE v_PhongGhe VARCHAR(10);
-    DECLARE v_TrangThaiGhe VARCHAR(20);
-    SELECT MAX(MaPhong), MAX(TIMESTAMP(NgayChieu, GioBatDau))
-      INTO v_PhongSuat, v_NgayGioChieu
-      FROM SuatChieu WHERE MaSuatChieu = NEW.MaSuatChieu;
-    SELECT MAX(MaPhong), MAX(TrangThai) INTO v_PhongGhe, v_TrangThaiGhe
-      FROM Ghe WHERE MaGhe = NEW.MaGhe;
-    IF v_PhongSuat IS NULL OR v_PhongGhe IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Suat chieu hoac ghe khong ton tai.';
+    DECLARE v_DoiCho BOOLEAN;
+    DECLARE v_BatDauCu DATETIME;
+    DECLARE v_TrangThaiSuatCu VARCHAR(20);
+    DECLARE v_PhutHuy INT;
+
+    SET v_DoiCho = NEW.MaSuatChieu <> OLD.MaSuatChieu OR NEW.MaGhe <> OLD.MaGhe;
+
+    IF OLD.TrangThai <> 'DaDat' AND (v_DoiCho OR NEW.TrangThai <> OLD.TrangThai) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ve da su dung hoac da huy khong the doi trang thai hay cho ngoi.';
     END IF;
-    IF v_PhongSuat <> v_PhongGhe THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ghe khong thuoc phong cua suat chieu.';
+    IF v_DoiCho AND NEW.TrangThai <> 'DaDat' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Doi ve phai giu trang thai DaDat.';
     END IF;
-    -- Chi kiem tra bao tri/thoi han ban khi chiem cho moi, doi ghe/suat,
-    -- hoac kich hoat lai ve da huy. Khong can kiem tra khi huy ve cu.
-    IF NEW.TrangThai IN ('DaDat', 'DaSuDung') AND (
-        OLD.TrangThai = 'DaHuy' OR NEW.MaSuatChieu <> OLD.MaSuatChieu
-        OR NEW.MaGhe <> OLD.MaGhe
-    ) THEN
-        IF v_TrangThaiGhe = 'BaoTri' THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong the ban ve cho ghe bao tri.';
-        END IF;
-        SELECT COALESCE(MAX(GiaTri), 5) INTO v_PhutBan
-          FROM CauHinhHeThong WHERE TenThamSo = 'PHUT_NGUNG_BAN';
-        IF v_NgayGioChieu < DATE_ADD(NOW(), INTERVAL v_PhutBan MINUTE) THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong the doi/kich hoat ve: suat chieu da ngung ban.';
-        END IF;
+
+    IF v_DoiCho OR NEW.TrangThai <> OLD.TrangThai THEN
+        SELECT TIMESTAMP(NgayChieu, GioBatDau), TrangThai
+          INTO v_BatDauCu, v_TrangThaiSuatCu
+          FROM SuatChieu WHERE MaSuatChieu = OLD.MaSuatChieu FOR SHARE;
     END IF;
-    IF NEW.TrangThai = 'DaHuy' AND OLD.TrangThai <> 'DaHuy' THEN
+
+    IF v_DoiCho OR (OLD.TrangThai = 'DaDat' AND NEW.TrangThai = 'DaHuy') THEN
         SELECT COALESCE(MAX(GiaTri), 60) INTO v_PhutHuy
           FROM CauHinhHeThong WHERE TenThamSo = 'PHUT_NGUNG_HUY';
-        -- Huy phai xet suat CU, tranh doi sang suat xa hon de vuot nguong.
-        SELECT MAX(TIMESTAMP(NgayChieu, GioBatDau)) INTO v_NgayGioCu
-          FROM SuatChieu WHERE MaSuatChieu = OLD.MaSuatChieu;
-        IF v_NgayGioCu < DATE_ADD(NOW(), INTERVAL v_PhutHuy MINUTE) THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong the huy ve: da qua thoi gian cho phep huy.';
+        IF v_BatDauCu <= NOW() OR v_BatDauCu < DATE_ADD(NOW(), INTERVAL v_PhutHuy MINUTE) THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Suat hien tai da qua han huy/doi ve.';
         END IF;
+    END IF;
+
+    IF v_DoiCho THEN
+        CALL usp_KiemTraDatVe(NEW.MaSuatChieu, NEW.MaGhe);
+    ELSEIF NEW.TrangThai = 'DaSuDung' AND OLD.TrangThai = 'DaDat' AND v_TrangThaiSuatCu = 'Huy' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong the su dung ve cua suat da huy.';
+    END IF;
+END //
+
+CREATE TRIGGER trg_Ghe_BeforeUpdate
+BEFORE UPDATE ON Ghe FOR EACH ROW
+BEGIN
+    IF NEW.MaPhong <> OLD.MaPhong AND EXISTS (
+        SELECT 1 FROM Ve WHERE MaGhe = OLD.MaGhe FOR SHARE
+    ) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong the chuyen phong cua ghe da co ve.';
+    END IF;
+END //
+
+CREATE PROCEDURE usp_KiemTraBaoTriGhe(IN p_MaGhe VARCHAR(15), IN p_MaPhong VARCHAR(10))
+BEGIN
+    DECLARE v_MaGhe VARCHAR(15);
+    SELECT MaGhe INTO v_MaGhe
+      FROM Ghe WHERE MaGhe = p_MaGhe AND MaPhong = p_MaPhong FOR UPDATE;
+
+    IF EXISTS (
+        SELECT 1
+        FROM Ve v JOIN SuatChieu sc ON sc.MaSuatChieu = v.MaSuatChieu
+        WHERE v.MaGhe = p_MaGhe AND v.TrangThai IN ('DaDat', 'DaSuDung')
+          AND sc.TrangThai NOT IN ('Huy', 'KetThuc')
+          AND TIMESTAMP(
+              DATE_ADD(sc.NgayChieu, INTERVAL (sc.GioKetThuc < sc.GioBatDau) DAY),
+              sc.GioKetThuc
+          ) > NOW()
+        FOR SHARE
+    ) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ghe dang co ve hieu luc, khong the bao tri.';
+    END IF;
+END //
+
+CREATE TRIGGER trg_GheBaoTri_BeforeInsert
+BEFORE INSERT ON GheBaoTri FOR EACH ROW
+BEGIN
+    CALL usp_KiemTraBaoTriGhe(NEW.MaGhe, NEW.MaPhong);
+END //
+
+CREATE TRIGGER trg_GheBaoTri_BeforeUpdate
+BEFORE UPDATE ON GheBaoTri FOR EACH ROW
+BEGIN
+    IF NEW.MaGhe <> OLD.MaGhe OR NEW.MaPhong <> OLD.MaPhong THEN
+        CALL usp_KiemTraBaoTriGhe(NEW.MaGhe, NEW.MaPhong);
+    END IF;
+END //
+
+CREATE PROCEDURE usp_KiemTraLichPhong(
+    IN p_MaPhong VARCHAR(10),
+    IN p_Ngay DATE,
+    IN p_BatDau TIME,
+    IN p_KetThuc TIME,
+    IN p_SuatCu VARCHAR(20)
+)
+BEGIN
+    DECLARE v_Phong VARCHAR(10);
+    DECLARE v_BatDau DATETIME;
+    DECLARE v_KetThuc DATETIME;
+    SET v_BatDau = TIMESTAMP(p_Ngay, p_BatDau);
+    SET v_KetThuc = TIMESTAMP(DATE_ADD(p_Ngay, INTERVAL (p_KetThuc < p_BatDau) DAY), p_KetThuc);
+
+    -- Cac giao dich xep lich cung phong phai lay khoa tren cung mot dong.
+    SELECT MaPhong INTO v_Phong
+      FROM PhongChieu WHERE MaPhong = p_MaPhong FOR UPDATE;
+    IF EXISTS (
+        SELECT 1 FROM SuatChieu sc
+        WHERE sc.MaPhong = p_MaPhong
+          AND sc.NgayChieu BETWEEN DATE_SUB(p_Ngay, INTERVAL 1 DAY) AND DATE_ADD(p_Ngay, INTERVAL 1 DAY)
+          AND sc.TrangThai <> 'Huy'
+          AND (p_SuatCu IS NULL OR sc.MaSuatChieu <> p_SuatCu)
+          AND TIMESTAMP(sc.NgayChieu, sc.GioBatDau) < v_KetThuc
+          AND TIMESTAMP(
+              DATE_ADD(sc.NgayChieu, INTERVAL (sc.GioKetThuc < sc.GioBatDau) DAY),
+              sc.GioKetThuc
+          ) > v_BatDau
+        FOR SHARE
+    ) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Suat chieu chong gio voi suat khac trong cung phong.';
+    END IF;
+END //
+
+CREATE TRIGGER trg_SuatChieu_BeforeInsert
+BEFORE INSERT ON SuatChieu FOR EACH ROW
+BEGIN
+    IF NEW.TrangThai <> 'Huy' THEN
+        CALL usp_KiemTraLichPhong(NEW.MaPhong, NEW.NgayChieu, NEW.GioBatDau, NEW.GioKetThuc, NULL);
+    END IF;
+END //
+
+CREATE TRIGGER trg_SuatChieu_BeforeUpdate
+BEFORE UPDATE ON SuatChieu FOR EACH ROW
+BEGIN
+    IF NEW.MaPhong <> OLD.MaPhong AND EXISTS (
+        SELECT 1 FROM Ve WHERE MaSuatChieu = OLD.MaSuatChieu FOR SHARE
+    ) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong the doi phong cua suat da co ve.';
+    END IF;
+
+    IF NEW.TrangThai <> 'Huy' AND (
+        OLD.TrangThai = 'Huy' OR NEW.MaPhong <> OLD.MaPhong OR NEW.NgayChieu <> OLD.NgayChieu
+        OR NEW.GioBatDau <> OLD.GioBatDau OR NEW.GioKetThuc <> OLD.GioKetThuc
+    ) THEN
+        CALL usp_KiemTraLichPhong(NEW.MaPhong, NEW.NgayChieu, NEW.GioBatDau, NEW.GioKetThuc, OLD.MaSuatChieu);
+    END IF;
+
+    IF NEW.TrangThai NOT IN ('Huy', 'KetThuc') AND (
+        OLD.TrangThai IN ('Huy', 'KetThuc') OR NEW.NgayChieu <> OLD.NgayChieu
+        OR NEW.GioBatDau <> OLD.GioBatDau OR NEW.GioKetThuc <> OLD.GioKetThuc
+    ) AND TIMESTAMP(
+        DATE_ADD(NEW.NgayChieu, INTERVAL (NEW.GioKetThuc < NEW.GioBatDau) DAY),
+        NEW.GioKetThuc
+    ) > NOW() AND EXISTS (
+        SELECT 1
+        FROM Ve v JOIN GheBaoTri bt ON bt.MaGhe = v.MaGhe AND bt.MaPhong = NEW.MaPhong
+        WHERE v.MaSuatChieu = OLD.MaSuatChieu AND v.TrangThai IN ('DaDat', 'DaSuDung')
+        FOR SHARE
+    ) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Suat chieu co ve hieu luc tren ghe dang bao tri.';
     END IF;
 END //
 DELIMITER ;

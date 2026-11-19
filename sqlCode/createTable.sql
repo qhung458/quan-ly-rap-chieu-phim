@@ -50,38 +50,50 @@ CREATE TABLE BapNuoc (
 
 -- BẢNG GHE (Ghế)
 CREATE TABLE Ghe (
-    MaGhe       VARCHAR(15) PRIMARY KEY,         
+    MaGhe       VARCHAR(15) NOT NULL,
     MaPhong     VARCHAR(10) NOT NULL,            
     SoHang        VARCHAR(5)  NOT NULL,            
     SoGhe       INT         NOT NULL,           
-    TrangThai   VARCHAR(20) NOT NULL DEFAULT 'Trong', 
+    LoaiGhe     VARCHAR(20) NOT NULL DEFAULT 'Thuong',
+    PRIMARY KEY (MaGhe, MaPhong),
+    UNIQUE (MaGhe),
     CHECK (SoGhe > 0),
-    CHECK (TrangThai IN ('Trong', 'DaDat', 'BaoTri')),
     CONSTRAINT FK_Ghe_PhongChieu 
         FOREIGN KEY (MaPhong) REFERENCES PhongChieu(MaPhong),
     CONSTRAINT UQ_Ghe_ViTri 
         UNIQUE (MaPhong, SoHang, SoGhe)
 );
 
+CREATE TABLE GheBaoTri (
+    MaGhe VARCHAR(15) NOT NULL,
+    MaPhong VARCHAR(10) NOT NULL,
+    PRIMARY KEY (MaGhe, MaPhong),
+    FOREIGN KEY (MaGhe, MaPhong) REFERENCES Ghe(MaGhe, MaPhong)
+);
+
 
 -- BẢNG SUATCHIEU (Suất chiếu)
 CREATE TABLE SuatChieu (
-    MaSuatChieu VARCHAR(20) PRIMARY KEY,          
+    MaSuatChieu VARCHAR(20) NOT NULL,
     MaPhim      VARCHAR(15) NOT NULL,             
     MaPhong     VARCHAR(10) NOT NULL,            
     NgayChieu   DATE        NOT NULL,            
     GioBatDau   TIME        NOT NULL,             
-    GioKetThuc  TIME        NULL,               
+    GioKetThuc  TIME        NOT NULL,
     GiaVe       DECIMAL(18,2) NOT NULL DEFAULT 0, 
     TrangThai   VARCHAR(20) NOT NULL DEFAULT 'SapChieu', 
+    PRIMARY KEY (MaSuatChieu, MaPhim, MaPhong),
+    UNIQUE (MaSuatChieu),
+    CHECK (GioBatDau >= '00:00:00' AND GioBatDau < '24:00:00'),
+    CHECK (GioKetThuc >= '00:00:00' AND GioKetThuc < '24:00:00'),
+    CHECK (GioBatDau <> GioKetThuc),
     CHECK (GiaVe >= 0),
     CHECK (TrangThai IN ('SapChieu', 'DangChieu', 'KetThuc', 'Huy')),
     CONSTRAINT FK_SuatChieu_Phim 
         FOREIGN KEY (MaPhim) REFERENCES Phim(MaPhim),
     CONSTRAINT FK_SuatChieu_PhongChieu 
         FOREIGN KEY (MaPhong) REFERENCES PhongChieu(MaPhong),
-    CONSTRAINT UQ_SuatChieu_Phong_ThoiGian 
-        UNIQUE (MaPhong, NgayChieu, GioBatDau)
+    INDEX IX_SuatChieu_LichPhong (MaPhong, NgayChieu, GioBatDau)
 );
 -- TAO BANG HOADON VA VE (chay sau Phim, PhongChieu, KhachHang, BapNuoc, Ghe, SuatChieu)
 -- BANG HOADON

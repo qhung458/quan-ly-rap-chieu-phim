@@ -16,7 +16,8 @@ BEGIN
         pc.MaPhong,
         pc.TenPhong,
         pc.LoaiPhong,
-        sc.GiaVe
+        sc.GiaVe,
+        sc.TrangThai
     FROM SuatChieu AS sc
     INNER JOIN Phim AS p
         ON p.MaPhim = sc.MaPhim
@@ -27,13 +28,5 @@ BEGIN
     ORDER BY sc.GioBatDau ASC;
 END $$
 DELIMITER ;
-
-
-
-
-
-
-
-
 
 
