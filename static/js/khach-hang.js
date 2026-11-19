@@ -3,135 +3,202 @@
   if (!window.jQuery) return;
 
   const $ = jQuery;
-  // Dữ liệu mẫu để xem giao diện. Tên trường khách hàng theo schema SQL.
-  const customers = [
-    { MaKhachHang: 'KH001', TenKhachHang: 'Nguyễn Văn An', SoDienThoai: '0900000001', Email: 'an@example.com' },
-    { MaKhachHang: 'KH002', TenKhachHang: 'Trần Thị Bình', SoDienThoai: '0900000002', Email: 'binh@example.com' },
-    { MaKhachHang: 'KH003', TenKhachHang: 'Lê Minh Khoa', SoDienThoai: '0900000003', Email: 'khoa@example.com' },
-    { MaKhachHang: 'KH004', TenKhachHang: 'Phạm Ngọc Anh', SoDienThoai: '0900000004', Email: '' }
-  ];
-
-  const ticketsByCustomer = {
-    KH001: [
-      { MaVe: 'V0105', TenPhim: 'Phim A', NgayDat: '25/10/2026' },
-      { MaVe: 'V0051', TenPhim: 'Phim B', NgayDat: '12/10/2026' }
-    ],
-    KH002: [{ MaVe: 'V0106', TenPhim: 'Phim C', NgayDat: '25/10/2026' }]
-  };
-
-  const $customerRows = $('#customer-rows');
-  const $ticketRows = $('#ticket-rows');
+  const api = '/api/khach-hang';
+  const $rows = $('#customer-rows');
+  const $tickets = $('#ticket-rows');
   const $form = $('#customer-form');
   const $message = $('#customer-message');
   const $search = $('#customer-search');
-  let selectedId = '';
+  const $clear = $('#clear-customer');
+  const $delete = $('#delete-customer');
+  let user;
+  let selected = null;
+  let saving = false;
+  let listVersion = 0;
+  let historyVersion = 0;
+  let searchTimer;
 
-  function showEmptyRow($tableBody, colspan, message) {
-    $tableBody.append($('<tr>').append($('<td>', { colspan, text: message })));
+  function showError(xhr) {
+    if (xhr.status === 401) {
+      location.assign('dang-nhap.html');
+      return;
+    }
+    $message.addClass('text-danger')
+      .text(xhr.responseJSON?.message || 'Không kết nối được máy chủ.');
   }
 
-  function normalizeSearch(value) {
-    return value.trim().toLocaleLowerCase('vi').normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd');
+  function emptyRow($body, columns, message) {
+    $body.empty().append($('<tr>').append($('<td>', { colspan: columns, text: message })));
   }
 
-  function renderCustomers() {
-    const keyword = normalizeSearch($search.val());
-    const matches = customers.filter(customer =>
-      Object.values(customer).some(value => normalizeSearch(value).includes(keyword))
-    );
+  function customerUrl(customer) {
+    return api + '/' + encodeURIComponent(customer.MaKhachHang);
+  }
 
-    $customerRows.empty();
-    $('#customer-count').text(matches.length + '/' + customers.length + ' khách hàng');
+  function syncButtons() {
+    $form.find('button[value="them"]').prop('disabled', !user || saving || Boolean(selected));
+    $form.find('button[value="sua"]').prop('disabled', saving || !selected);
+    $delete.prop('disabled', saving || !selected || user?.VaiTro !== 'QuanTriVien');
+    $clear.prop('disabled', !user || saving);
+  }
 
-    if (matches.length === 0) {
-      showEmptyRow($customerRows, 4, 'Không tìm thấy khách hàng.');
+  function setCustomer(customer) {
+    selected = customer;
+    $form[0].reset();
+    $('#customer-id').prop('readOnly', Boolean(customer));
+
+    if (customer) {
+      for (const [field, value] of Object.entries(customer)) {
+        $form[0].elements.namedItem(field).value = value ?? '';
+      }
     }
 
-    for (const customer of matches) {
+    $rows.find('.customer-selector').each(function () {
+      const $button = $(this);
+      const active = $button.data('customer').MaKhachHang === selected?.MaKhachHang;
+      $button.attr('aria-pressed', String(active)).closest('tr').toggleClass('is-selected', active);
+    });
+    syncButtons();
+    loadTickets();
+  }
+
+  function renderCustomers(customers) {
+    $rows.empty();
+    $('#customer-count').text(customers.length + ' khách hàng');
+    if (!customers.length) emptyRow($rows, 4, 'Không tìm thấy khách hàng.');
+
+    for (const customer of customers) {
+      const active = customer.MaKhachHang === selected?.MaKhachHang;
       const $button = $('<button>', {
         type: 'button',
         class: 'customer-selector',
         text: customer.MaKhachHang,
-        'data-customer-id': customer.MaKhachHang,
-        'aria-pressed': String(customer.MaKhachHang === selectedId)
-      });
-
-      $customerRows.append($('<tr>')
-        .toggleClass('is-selected', customer.MaKhachHang === selectedId)
-        .append($('<td>').append($button))
-        .append($('<td>').text(customer.TenKhachHang))
-        .append($('<td>').text(customer.SoDienThoai))
-        .append($('<td>').text(customer.Email || '—')));
+        'aria-pressed': String(active)
+      }).data('customer', customer);
+      $rows.append($('<tr>').toggleClass('is-selected', active).append(
+        $('<td>').append($button),
+        $('<td>').text(customer.TenKhachHang),
+        $('<td>').text(customer.SoDienThoai),
+        $('<td>').text(customer.Email ?? '—')
+      ));
     }
   }
 
-  function renderTickets() {
-    $ticketRows.empty();
+  async function loadCustomers() {
+    const version = ++listVersion;
+    try {
+      const rows = await $.getJSON(api, { q: $search.val() });
+      if (version === listVersion) renderCustomers(rows);
+    } catch (xhr) {
+      if (version !== listVersion) return;
+      emptyRow($rows, 4, 'Không tải được danh sách khách hàng.');
+      $('#customer-count').empty();
+      showError(xhr);
+    }
+  }
 
-    if (!selectedId) {
-      showEmptyRow($ticketRows, 3, 'Chọn một khách hàng để xem lịch sử.');
+  async function loadTickets() {
+    const version = ++historyVersion;
+    if (!selected) {
+      emptyRow($tickets, 4, 'Chọn một khách hàng để xem lịch sử.');
       return;
     }
 
-    const tickets = ticketsByCustomer[selectedId] || [];
-    if (tickets.length === 0) {
-      showEmptyRow($ticketRows, 3, 'Khách hàng chưa có lịch sử mua vé.');
-    }
+    emptyRow($tickets, 4, 'Đang tải lịch sử…');
+    try {
+      const tickets = await $.getJSON(customerUrl(selected) + '/ve');
+      if (version !== historyVersion) return;
 
-    for (const ticket of tickets) {
-      $ticketRows.append($('<tr>')
-        .append($('<td>').text(ticket.MaVe))
-        .append($('<td>').text(ticket.TenPhim))
-        .append($('<td>').text(ticket.NgayDat)));
-    }
-  }
-
-  function selectCustomer(customer) {
-    selectedId = customer ? customer.MaKhachHang : '';
-    $form[0].reset();
-    $message.empty();
-
-    if (customer) {
-      for (const [field, value] of Object.entries(customer)) {
-        $form[0].elements.namedItem(field).value = value;
+      $tickets.empty();
+      if (!tickets.length) emptyRow($tickets, 4, 'Khách hàng chưa có lịch sử mua vé.');
+      const statuses = { DaDat: 'Đã đặt', DaSuDung: 'Đã sử dụng', DaHuy: 'Đã hủy' };
+      for (const ticket of tickets) {
+        $tickets.append($('<tr>').append(
+          $('<td>').text(ticket.MaVe),
+          $('<td>').text(ticket.TenPhim),
+          $('<td>').text(ticket.NgayDat),
+          $('<td>').text(statuses[ticket.TrangThai] ?? ticket.TrangThai)
+        ));
       }
+    } catch (xhr) {
+      if (version !== historyVersion) return;
+      emptyRow($tickets, 4, 'Không tải được lịch sử.');
+      showError(xhr);
     }
-
-    $('#customer-id').prop('readOnly', Boolean(customer));
-    $form.find('button[value="them"]').prop('disabled', Boolean(customer));
-    $form.find('button[value="sua"], #delete-customer').prop('disabled', !customer);
-
-    $customerRows.find('.customer-selector').each(function () {
-      const isSelected = this.dataset.customerId === selectedId;
-      $(this).attr('aria-pressed', String(isSelected)).closest('tr').toggleClass('is-selected', isSelected);
-    });
-
-    renderTickets();
   }
 
-  $search.on('input', renderCustomers);
-  $customerRows.on('click', 'tr', function () {
-    const id = $(this).find('.customer-selector').attr('data-customer-id');
-    const customer = customers.find(item => item.MaKhachHang === id);
-    if (customer) selectCustomer(customer);
-  });
+  async function saveCustomer(method, url, payload) {
+    if (!user || saving) return;
+    saving = true;
+    syncButtons();
+    $message.removeClass('text-danger').empty();
 
-  $('#clear-customer').on('click', () => {
-    selectCustomer(null);
-    $('#customer-id').trigger('focus');
-  });
+    try {
+      const saved = await $.ajax({
+        url,
+        method,
+        contentType: 'application/json',
+        data: payload ? JSON.stringify(payload) : undefined
+      });
+      setCustomer(method === 'DELETE' ? null : saved);
+      const actions = { POST: 'Đã thêm khách hàng.', PUT: 'Đã cập nhật khách hàng.', DELETE: 'Đã xóa khách hàng.' };
+      $message.text(actions[method]);
+      await loadCustomers();
+    } catch (xhr) {
+      showError(xhr);
+    } finally {
+      saving = false;
+      syncButtons();
+    }
+  }
 
   $form.on('submit', event => {
     event.preventDefault();
-    const action = selectedId ? 'sửa' : 'thêm';
-    $message.text('Nút ' + action + ' đang ở chế độ xem thử.');
+    const payload = Object.fromEntries(new FormData($form[0]));
+    saveCustomer(selected ? 'PUT' : 'POST', selected ? customerUrl(selected) : api, payload);
   });
 
-  $('#delete-customer').on('click', () => {
-    $message.text('Nút xóa đang ở chế độ xem thử.');
+  $rows.on('click', 'tr', function () {
+    const customer = $(this).find('.customer-selector').data('customer');
+    if (saving || !customer) return;
+    $message.empty();
+    setCustomer(customer);
   });
 
-  $search.add('#clear-customer').prop('disabled', false);
-  renderCustomers();
-  selectCustomer(null);
+  $clear.on('click', () => {
+    $message.empty();
+    setCustomer(null);
+    $('#customer-id').trigger('focus');
+  });
+
+  $delete.on('click', () => {
+    if (selected && window.confirm('Xóa khách hàng ' + selected.MaKhachHang + '?')) {
+      saveCustomer('DELETE', customerUrl(selected));
+    }
+  });
+
+  $search.on('input', () => {
+    listVersion++;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(loadCustomers, 250);
+  });
+
+  $('#logout-button').on('click', async () => {
+    try {
+      await $.ajax({ url: '/api/auth/logout', method: 'POST' });
+      location.assign('dang-nhap.html');
+    } catch (xhr) {
+      showError(xhr);
+    }
+  });
+
+  $.getJSON('/api/auth/me').done(account => {
+    user = account;
+    $('#account-name').text(user.HoTen + ' · ' +
+      (user.VaiTro === 'QuanTriVien' ? 'Quản trị viên' : 'Nhân viên quầy'));
+    $('#logout-button').prop('hidden', false);
+    $search.prop('disabled', false);
+    syncButtons();
+    loadCustomers();
+  }).fail(showError);
 })();

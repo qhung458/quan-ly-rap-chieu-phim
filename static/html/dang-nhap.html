@@ -44,19 +44,14 @@
           <h2 id="register-title">Đăng ký</h2>
           <form id="register-form" method="post" class="form-stack">
             <label class="form-label" for="register-fullname">Họ và tên</label>
-            <input class="form-control" id="register-fullname" name="HoTen" type="text" autocomplete="name" required>
+            <input class="form-control" id="register-fullname" name="HoTen" maxlength="100" type="text" autocomplete="name" required>
             <label class="form-label" for="register-name">Tên đăng nhập</label>
-            <input class="form-control" id="register-name" name="TenDangNhap" type="text" autocomplete="username" required>
+            <input class="form-control" id="register-name" name="TenDangNhap" minlength="3" maxlength="50" pattern="[A-Za-z0-9_]+" type="text" autocomplete="username" required>
             <label class="form-label" for="register-password">Mật khẩu</label>
-            <input class="form-control" id="register-password" name="MatKhau" type="password" autocomplete="new-password" required>
+            <input class="form-control" id="register-password" name="MatKhau" type="password" autocomplete="new-password" minlength="12" required>
             <label class="form-label" for="register-confirm">Nhập lại mật khẩu</label>
-            <input class="form-control" id="register-confirm" name="XacNhanMatKhau" type="password" autocomplete="new-password" required>
-            <label class="form-label" for="register-role">Vai trò</label>
-            <select class="form-select" id="register-role" name="VaiTro" required>
-              <option value="">Chọn vai trò</option>
-              <option value="NhanVien">Nhân viên quầy</option>
-              <option value="QuanTriVien">Quản trị viên</option>
-            </select>
+            <input class="form-control" id="register-confirm" name="XacNhanMatKhau" type="password" autocomplete="new-password" minlength="12" required>
+            <p class="text-secondary small mb-2">Tài khoản đăng ký có vai trò nhân viên quầy.</p>
             <button class="btn btn-dark" type="submit" disabled>Đăng ký</button>
             <p class="form-message" role="status"></p>
           </form>

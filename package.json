@@ -1,0 +1,27 @@
+{
+  "name": "quanlyrapchieuphim",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node --env-file=.env server/index.cjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qhung458/quan-ly-rap-chieu-phim.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/qhung458/quan-ly-rap-chieu-phim/issues"
+  },
+  "homepage": "https://github.com/qhung458/quan-ly-rap-chieu-phim#readme",
+  "dependencies": {
+    "express": "^5.3.0",
+    "express-session": "^1.19.0",
+    "mysql2": "^3.24.6"
+  }
+}

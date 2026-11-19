@@ -10,7 +10,10 @@
   <body class="app-layout">
     <header class="app-header d-flex align-items-center justify-content-between gap-3">
       <a class="brand" href="dang-nhap.html"><span aria-hidden="true">▶</span> Quản lý rạp chiếu phim</a>
-      <a class="header-link" href="dang-nhap.html">Tài khoản</a>
+      <div class="d-flex align-items-center gap-3">
+        <span id="account-name" class="small"></span>
+        <button id="logout-button" class="btn btn-outline-dark btn-sm" type="button" hidden>Đăng xuất</button>
+      </div>
     </header>
     <nav class="sidebar" aria-label="Điều hướng chính">
       <ul class="menu-list">
@@ -44,7 +47,7 @@
                 </tr>
               </thead>
               <tbody id="customer-rows">
-                <tr><td colspan="4">Cần tải jQuery để xem dữ liệu mẫu.</td></tr>
+                <tr><td colspan="4">Đang tải danh sách khách hàng…</td></tr>
               </tbody>
             </table>
           </div>
@@ -84,10 +87,11 @@
                     <th scope="col">Mã vé</th>
                     <th scope="col">Phim</th>
                     <th scope="col">Ngày đặt</th>
+                    <th scope="col">Trạng thái</th>
                   </tr>
                 </thead>
                 <tbody id="ticket-rows">
-                  <tr><td colspan="3">Chọn một khách hàng để xem lịch sử.</td></tr>
+                  <tr><td colspan="4">Chọn một khách hàng để xem lịch sử.</td></tr>
                 </tbody>
               </table>
             </div>
