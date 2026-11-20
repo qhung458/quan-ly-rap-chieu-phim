@@ -4,6 +4,8 @@ const path = require('node:path');
 const db = require('./db.cjs');
 const { router: auth } = require('./auth.cjs');
 const customers = require('./customers.cjs');
+const rooms = require('./rooms.cjs');
+const tickets = require('./tickets.cjs');
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -42,10 +44,12 @@ app.get('/api/health', async (_req, res) => {
 });
 app.use('/api/auth', auth);
 app.use('/api/khach-hang', customers);
+app.use('/api/phong-chieu', rooms);
+app.use('/api/ban-ve', tickets);
 app.use('/api', (_req, res) => res.status(404).json({ message: 'Không tìm thấy API.' }));
 
 app.get('/', (_req, res) => res.redirect('/html/dang-nhap.html'));
-app.get('/html/khach-hang.html', (req, res, next) => {
+app.get(['/html/khach-hang.html', '/html/phong-chieu-va-ghe.html', '/html/ban-ve.html'], (req, res, next) => {
   res.set('Cache-Control', 'no-store');
   if (!req.session.user) return res.redirect('/html/dang-nhap.html');
   next();

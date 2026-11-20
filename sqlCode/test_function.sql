@@ -9,13 +9,13 @@ SELECT
 FROM (
     SELECT
         'SC047' AS MaSuatChieu,
-        17 AS MongDoi,
+        18 AS MongDoi,
         fn_SoGheTrong('SC047') AS ThucTe
 
     UNION ALL
 
     SELECT
-        'T26_TRONG', 19,
+        'T26_TRONG', 20,
         fn_SoGheTrong('T26_TRONG')
 
     UNION ALL
@@ -27,7 +27,7 @@ FROM (
     UNION ALL
 
     SELECT
-        'T26_HUY_BANLAI', 18,
+        'T26_HUY_BANLAI', 19,
         fn_SoGheTrong('T26_HUY_BANLAI')
 
     UNION ALL

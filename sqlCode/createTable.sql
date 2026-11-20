@@ -64,14 +64,6 @@ CREATE TABLE Ghe (
         UNIQUE (MaPhong, SoHang, SoGhe)
 );
 
-CREATE TABLE GheBaoTri (
-    MaGhe VARCHAR(15) NOT NULL,
-    MaPhong VARCHAR(10) NOT NULL,
-    PRIMARY KEY (MaGhe, MaPhong),
-    FOREIGN KEY (MaGhe, MaPhong) REFERENCES Ghe(MaGhe, MaPhong)
-);
-
-
 -- BẢNG SUATCHIEU (Suất chiếu)
 CREATE TABLE SuatChieu (
     MaSuatChieu VARCHAR(20) NOT NULL,

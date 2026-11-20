@@ -30,10 +30,6 @@ BEGIN
     FROM Ghe g
     WHERE g.MaPhong = v_MaPhong
       AND NOT EXISTS (
-          SELECT 1 FROM GheBaoTri bt
-          WHERE bt.MaGhe = g.MaGhe AND bt.MaPhong = g.MaPhong
-      )
-      AND NOT EXISTS (
           SELECT 1
           FROM Ve v
           WHERE v.MaSuatChieu = p_MaSuatChieu

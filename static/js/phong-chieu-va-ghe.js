@@ -3,379 +3,344 @@
   if (!window.jQuery) return;
 
   const $ = jQuery;
-  const roomTypes = ['2D', '3D'];
-  const seatStatuses = {
-    Trong: 'Trống',
-    DaDat: 'Đã đặt',
-    BaoTri: 'Bảo trì'
-  };
-  const rooms = [
-    { MaPhong: 'PC01', TenPhong: 'Phòng 01', LoaiPhong: '2D' },
-    { MaPhong: 'PC02', TenPhong: 'Phòng 02', LoaiPhong: '2D' },
-    { MaPhong: 'PC03', TenPhong: 'Phòng 03', LoaiPhong: '3D' }
-  ];
-  const seats = [];
-  let nextSeatNumber = 1;
-  let selectedRoomId = '';
-  let selectedSeatId = '';
-  let roomMode = 'idle';
-  let seatMode = 'idle';
-
-  // Tạo dữ liệu xem thử theo mẫu SQL: 4 hàng, 5 ghế mỗi hàng trong một phòng.
-  for (const room of rooms) {
-    for (let index = 0; index < 20; index++) {
-      const row = String.fromCharCode(65 + Math.floor(index / 5));
-      const number = index % 5 + 1;
-      seats.push({
-        MaGhe: 'G' + String(nextSeatNumber).padStart(3, '0'),
-        MaPhong: room.MaPhong,
-        SoHang: row,
-        SoGhe: number,
-        TrangThai: nextSeatNumber % 17 === 0 ? 'BaoTri' : 'Trong'
-      });
-      nextSeatNumber++;
-    }
-  }
-
+  const api = '/api/phong-chieu';
   const $roomForm = $('#room-form');
   const $seatForm = $('#seat-form');
   const $roomRows = $('#room-rows');
   const $seatRows = $('#seat-rows');
+  const $roomMessage = $('#room-message');
+  const $seatMessage = $('#seat-message');
+  const $roomSeatCount = $('#room-seat-count');
+  const $seatsPerRow = $('#room-seats-per-row');
+
+  let user;
+  let rooms = [];
+  let seats = [];
+  let room = null;
+  let seat = null;
+  let roomMode = '';
+  let seatMode = '';
+  let roomsLoading = false;
+  let seatsLoading = false;
+  let saving = false;
+  let seatRequest = 0;
+
+  function showMessage($element, message, isError = false) {
+    $element.toggleClass('text-danger', isError).text(message);
+  }
+
+  function showError($element, xhr) {
+    if (xhr.status === 401) {
+      location.assign('dang-nhap.html');
+      return;
+    }
+    showMessage($element, xhr.responseJSON?.message || 'Không kết nối được máy chủ.', true);
+  }
 
   function emptyRow($body, colspan, message) {
-    $body.append($('<tr>').append($('<td>', { colspan, text: message })));
+    $body.empty().append($('<tr>').append($('<td>', { colspan, text: message })));
   }
 
-  function roomById(id) {
-    return rooms.find(room => room.MaPhong === id);
+  function roomUrl() {
+    return api + '/' + encodeURIComponent(room.MaPhong);
   }
 
-  function roomSeats(roomId) {
-    return seats.filter(seat => seat.MaPhong === roomId);
+  function seatUrl() {
+    return roomUrl() + '/ghe/' + encodeURIComponent(seat.MaGhe);
   }
 
-  function roomSeatCount(roomId) {
-    return roomSeats(roomId).length;
+  function syncControls() {
+    const canManage = Boolean(user) && !saving && !roomsLoading;
+    const canDelete = canManage && user.VaiTro === 'QuanTriVien';
+    const roomEditing = canManage && Boolean(roomMode);
+    const canManageSeats = canManage && Boolean(room) && !seatsLoading;
+    const seatEditing = canManageSeats && Boolean(seatMode);
+
+    $('#room-id').prop('disabled', !room && !roomEditing).prop('readOnly', roomMode !== 'add');
+    $('#room-name, #room-type').prop('disabled', !roomEditing);
+    $roomSeatCount.prop('disabled', !room && !roomEditing).prop('readOnly', !roomEditing || roomMode !== 'add');
+    $seatsPerRow.add('label[for="room-seats-per-row"]').prop('hidden', roomMode !== 'add');
+    $seatsPerRow.prop('disabled', !roomEditing || roomMode !== 'add');
+    $('#add-room').prop('disabled', !canManage || Boolean(roomMode));
+    $('#save-room').prop('disabled', !roomEditing);
+    $('#edit-room').prop('disabled', !canManage || !room || Boolean(roomMode));
+    $('#delete-room').prop('disabled', !canDelete || !room || Boolean(roomMode));
+    $('#clear-room, #logout-button').prop('disabled', !canManage);
+
+    $('#seat-row, #seat-number').prop('disabled', !seatEditing);
+    $('#add-seat').text(seatMode === 'add' ? 'Lưu ghế' : 'Thêm')
+      .prop('disabled', !canManageSeats || seatMode === 'edit');
+    $('#edit-seat').text(seatMode === 'edit' ? 'Lưu sửa' : 'Sửa')
+      .prop('disabled', !canManageSeats || !seat || seatMode === 'add');
+    $('#delete-seat').prop('disabled', !canManageSeats || !canDelete || !seat || Boolean(seatMode));
+    $('#clear-seat').prop('disabled', !canManageSeats || (!seat && !seatMode));
   }
 
-  function showMessage(selector, message, isError = false) {
-    $(selector).toggleClass('text-danger', isError).text(message);
-  }
-
-  function setRoomMode(mode) {
-    roomMode = mode;
-    const selected = mode === 'selected';
-    const editing = mode === 'editing';
-    const adding = mode === 'adding';
-    $('#room-id').prop('readOnly', selected || editing || adding).prop('disabled', mode === 'idle');
-    $('#room-name, #room-type').prop('disabled', mode === 'idle');
-    $('#room-seat-count').prop('disabled', mode === 'idle').prop('readOnly', selected || editing);
-    $('#add-room').prop('disabled', selected || editing || adding);
-    $('#save-room').prop('disabled', !editing && !adding);
-    $('#edit-room, #delete-room').prop('disabled', !selected);
-    $('#clear-room').prop('disabled', mode === 'idle');
-  }
-
-  function setSeatMode(mode) {
-    seatMode = mode;
-    const canEdit = Boolean(selectedRoomId) && (mode === 'adding' || mode === 'editing');
-    const isSelected = mode === 'selected';
-    $('#add-seat').text(mode === 'adding' ? 'Lưu ghế' : 'Thêm');
-    $('#edit-seat').text(mode === 'editing' ? 'Lưu sửa' : 'Sửa');
-    $('#seat-id, #seat-room').prop('disabled', !selectedRoomId);
-    $('#seat-row, #seat-number, #seat-status').prop('disabled', !canEdit);
-    $('#seat-id').prop('readOnly', true);
-    $('#add-seat').prop('disabled', !selectedRoomId || isSelected || mode === 'editing');
-    $('#edit-seat, #delete-seat').prop('disabled', !isSelected);
-  }
-
-  function updateRoomCount() {
-    $('#room-count').text(rooms.length + ' phòng');
+  function recordRow(code, kind, active, values) {
+    const $button = $('<button>', {
+      type: 'button',
+      class: kind + '-selector',
+      text: code,
+      'aria-pressed': String(active)
+    });
+    const $row = $('<tr>').attr('data-' + kind + '-id', code).toggleClass('is-selected', active)
+      .append($('<td>').append($button));
+    for (const value of values) $row.append($('<td>').text(value));
+    return $row;
   }
 
   function renderRooms() {
     $roomRows.empty();
-    updateRoomCount();
+    $('#room-count').text(rooms.length + ' phòng');
     if (!rooms.length) emptyRow($roomRows, 4, 'Chưa có phòng chiếu.');
-
-    for (const room of rooms) {
-      const $id = $('<button>', {
-        type: 'button', class: 'room-selector', text: room.MaPhong,
-        'data-room-id': room.MaPhong, 'aria-pressed': String(room.MaPhong === selectedRoomId)
-      });
-      $roomRows.append($('<tr>')
-        .toggleClass('is-selected', room.MaPhong === selectedRoomId)
-        .attr('data-room-id', room.MaPhong)
-        .append($('<td>').append($id))
-        .append($('<td>').text(room.TenPhong))
-        .append($('<td>').text(roomSeatCount(room.MaPhong)))
-        .append($('<td>').text(room.LoaiPhong)));
+    for (const item of rooms) {
+      $roomRows.append(recordRow(item.MaPhong, 'room', item.MaPhong === room?.MaPhong,
+        [item.TenPhong, item.SoGhe, item.LoaiPhong]));
     }
   }
 
   function renderSeats() {
     $seatRows.empty();
-    const visibleSeats = roomSeats(selectedRoomId);
-    $('#seat-count').text(selectedRoomId ? visibleSeats.length + ' ghế' : '');
-    if (!selectedRoomId) {
-      emptyRow($seatRows, 5, 'Chọn một phòng để xem danh sách ghế.');
-      return;
-    }
-    if (!visibleSeats.length) emptyRow($seatRows, 5, 'Phòng này chưa có ghế.');
-
-    for (const seat of visibleSeats) {
-      const $id = $('<button>', {
-        type: 'button', class: 'seat-selector', text: seat.MaGhe,
-        'data-seat-id': seat.MaGhe, 'aria-pressed': String(seat.MaGhe === selectedSeatId)
-      });
-      $seatRows.append($('<tr>')
-        .toggleClass('is-selected', seat.MaGhe === selectedSeatId)
-        .attr('data-seat-id', seat.MaGhe)
-        .append($('<td>').append($id))
-        .append($('<td>').text(seat.MaPhong))
-        .append($('<td>').text(seat.SoHang))
-        .append($('<td>').text(seat.SoGhe))
-        .append($('<td>').text(seatStatuses[seat.TrangThai] || seat.TrangThai)));
+    $('#seat-count').text(room ? seats.length + ' ghế' : '');
+    if (!room) return emptyRow($seatRows, 4, 'Chọn một phòng để xem danh sách ghế.');
+    if (!seats.length) emptyRow($seatRows, 4, 'Phòng này chưa có ghế.');
+    for (const item of seats) {
+      $seatRows.append(recordRow(item.MaGhe, 'seat', item.MaGhe === seat?.MaGhe,
+        [item.MaPhong, item.SoHang, item.SoGhe]));
     }
   }
 
-  function resetRoomForm() {
+  function showRoom(item) {
+    room = item;
+    roomMode = '';
     $roomForm[0].reset();
-    $('#room-id').val('').prop('readOnly', false);
-    $('#room-seat-count').val('').prop('readOnly', false);
-    setRoomMode('idle');
-    showMessage('#room-message', '');
-  }
-
-  function resetSeatForm() {
-    $seatForm[0].reset();
-    $('#seat-room').val(selectedRoomId);
-    $('#seat-id').val('');
-    $('#seat-status').val('Trong');
-    setSeatMode(selectedRoomId ? 'idle' : 'idle');
-    showMessage('#seat-message', '');
-  }
-
-  function selectRoom(room) {
-    selectedRoomId = room ? room.MaPhong : '';
-    selectedSeatId = '';
-    resetRoomForm();
-    resetSeatForm();
+    $('#room-id').val(room?.MaPhong ?? '');
+    $('#room-name').val(room?.TenPhong ?? '');
+    $roomSeatCount.val(room?.SoGhe ?? '');
+    if (room) $('#room-type').val(room.LoaiPhong);
     $('#selected-room-label').text(room ? '— ' + room.MaPhong : '');
-
-    if (room) {
-      $('#room-id').val(room.MaPhong);
-      $('#room-name').val(room.TenPhong);
-      $('#room-seat-count').val(roomSeatCount(room.MaPhong));
-      $('#room-type').val(room.LoaiPhong);
-      setRoomMode('selected');
-    }
     renderRooms();
-    renderSeats();
+    syncControls();
   }
 
-  function selectSeat(seat) {
-    selectedSeatId = seat ? seat.MaGhe : '';
-    resetSeatForm();
-    if (seat) {
-      $('#seat-id').val(seat.MaGhe);
-      $('#seat-room').val(seat.MaPhong);
-      $('#seat-row').val(seat.SoHang);
-      $('#seat-number').val(seat.SoGhe);
-      $('#seat-status').val(seat.TrangThai);
-      setSeatMode('selected');
+  function showSeat(item) {
+    seat = item;
+    seatMode = '';
+    $seatForm[0].reset();
+    $('#seat-room').val(room?.MaPhong ?? '');
+    $('#seat-id').val(seat?.MaGhe ?? '').removeAttr('placeholder');
+    $('#seat-row').val(seat?.SoHang ?? '');
+    $('#seat-number').val(seat?.SoGhe ?? '');
+    syncControls();
+  }
+
+  async function loadRooms() {
+    roomsLoading = true;
+    syncControls();
+    $('#room-count').empty();
+    emptyRow($roomRows, 4, 'Đang tải phòng chiếu…');
+    try {
+      rooms = await $.getJSON(api);
+      renderRooms();
+    } catch (xhr) {
+      emptyRow($roomRows, 4, 'Không tải được danh sách phòng. Chọn Làm mới để thử lại.');
+      showError($roomMessage, xhr);
+    } finally {
+      roomsLoading = false;
+      syncControls();
     }
-    renderSeats();
   }
 
-  function nextRoomId() {
-    let number = 1;
-    while (roomById('PC' + String(number).padStart(2, '0'))) number++;
-    return 'PC' + String(number).padStart(2, '0');
+  async function loadSeats(selectedCode) {
+    const request = ++seatRequest;
+    seats = [];
+    seatsLoading = Boolean(room);
+    showSeat(null);
+    if (!room) return renderSeats();
+
+    $('#seat-count').empty();
+    emptyRow($seatRows, 4, 'Đang tải ghế…');
+    try {
+      const rows = await $.getJSON(roomUrl() + '/ghe');
+      if (request !== seatRequest) return;
+      seats = rows;
+      room.SoGhe = seats.length;
+      if (!roomMode) $roomSeatCount.val(room.SoGhe);
+      renderRooms();
+      showSeat(seats.find(item => item.MaGhe === selectedCode) ?? null);
+      renderSeats();
+    } catch (xhr) {
+      if (request !== seatRequest) return;
+      emptyRow($seatRows, 4, 'Không tải được ghế. Chọn lại phòng để thử lại.');
+      showError($seatMessage, xhr);
+    } finally {
+      if (request === seatRequest) {
+        seatsLoading = false;
+        syncControls();
+      }
+    }
   }
 
-  function nextSeatId() {
-    while (seats.some(seat => seat.MaGhe === 'G' + String(nextSeatNumber).padStart(3, '0'))) nextSeatNumber++;
-    return 'G' + String(nextSeatNumber++).padStart(3, '0');
-  }
-
-  function createInitialSeats(roomId, count) {
-    for (let index = 0; index < count; index++) {
-      seats.push({
-        MaGhe: nextSeatId(), MaPhong: roomId,
-        SoHang: String.fromCharCode(65 + Math.floor(index / 5)),
-        SoGhe: index % 5 + 1, TrangThai: 'Trong'
+  async function change(method, url, payload, $message, onSaved) {
+    if (!user || saving || roomsLoading) return;
+    saving = true;
+    syncControls();
+    showMessage($message, '');
+    try {
+      const result = await $.ajax({
+        url,
+        method,
+        contentType: 'application/json',
+        data: payload ? JSON.stringify(payload) : undefined
       });
+      await onSaved(result);
+    } catch (xhr) {
+      showError($message, xhr);
+    } finally {
+      saving = false;
+      syncControls();
     }
   }
 
-  $('#room-rows').on('click', '[data-room-id]', function () {
-    const room = roomById(this.dataset.roomId);
-    if (room) selectRoom(room);
+  function selectRoom(item) {
+    showMessage($roomMessage, '');
+    showMessage($seatMessage, '');
+    showRoom(item);
+    return loadSeats();
+  }
+
+  $roomRows.on('click', 'tr[data-room-id]', function () {
+    if (!saving && !roomsLoading) selectRoom(rooms.find(item => item.MaPhong === this.dataset.roomId));
   });
 
-  $('#seat-rows').on('click', '[data-seat-id]', function () {
-    const seat = seats.find(item => item.MaGhe === this.dataset.seatId);
-    if (seat) selectSeat(seat);
+  $seatRows.on('click', 'tr[data-seat-id]', function () {
+    if (saving || seatsLoading || roomsLoading) return;
+    showMessage($seatMessage, '');
+    showSeat(seats.find(item => item.MaGhe === this.dataset.seatId));
+    renderSeats();
   });
 
   $('#add-room').on('click', () => {
-    selectedRoomId = '';
-    selectedSeatId = '';
-    resetRoomForm();
-    resetSeatForm();
-    $('#selected-room-label').empty();
-    renderRooms();
-    renderSeats();
-    $('#room-id').val(nextRoomId());
-    $('#room-seat-count').val(20);
-    $('#room-type').val(roomTypes[0]);
-    setRoomMode('adding');
-    showMessage('#room-message', 'Khi thêm phòng, hệ thống tạo vị trí ghế theo số lượng đã nhập.');
+    selectRoom(null);
+    let number = 1;
+    const used = new Set(rooms.map(item => item.MaPhong.toUpperCase()));
+    const suggestedCode = () => 'PC' + String(number).padStart(2, '0');
+    while (used.has(suggestedCode())) number++;
+    roomMode = 'add';
+    $('#room-id').val(suggestedCode());
+    $roomSeatCount.val(20).trigger('input');
+    syncControls();
     $('#room-name').trigger('focus');
   });
 
+  $roomSeatCount.on('input', function () {
+    $seatsPerRow.attr('max', this.value || null);
+  });
+
   $('#edit-room').on('click', () => {
-    const room = roomById(selectedRoomId);
-    if (!room) return;
-    $('#room-name, #room-type').prop('disabled', false);
-    $('#room-seat-count').val(roomSeatCount(room.MaPhong)).prop('disabled', false).prop('readOnly', true);
-    $('#save-room').prop('disabled', false);
-    $('#edit-room, #delete-room, #add-room').prop('disabled', true);
-    roomMode = 'editing';
-    showMessage('#room-message', 'Sửa tên phòng hoặc loại phòng rồi chọn Lưu.');
+    roomMode = 'edit';
+    syncControls();
+    $('#room-name').trigger('focus');
   });
 
   $roomForm.on('submit', event => {
     event.preventDefault();
-    if (!event.currentTarget.reportValidity()) return;
-    const id = $('#room-id').val().trim().toUpperCase();
-    const name = $('#room-name').val().trim();
-    const type = $('#room-type').val();
-    if (roomMode === 'adding' && !selectedRoomId) {
-      const seatCount = Number($('#room-seat-count').val());
-      if (rooms.some(room => room.MaPhong === id)) {
-        showMessage('#room-message', 'Mã phòng đã tồn tại.', true);
-        return;
-      }
-      if (rooms.some(room => room.TenPhong.toLocaleLowerCase('vi') === name.toLocaleLowerCase('vi'))) {
-        showMessage('#room-message', 'Tên phòng đã được sử dụng.', true);
-        return;
-      }
-      const room = { MaPhong: id, TenPhong: name, LoaiPhong: type };
-      rooms.push(room);
-      createInitialSeats(id, seatCount);
-      renderRooms();
-      selectRoom(room);
-      showMessage('#room-message', 'Đã thêm phòng và ' + seatCount + ' ghế mẫu.');
-      return;
+    if (!roomMode || saving || !event.currentTarget.reportValidity()) return;
+    const adding = roomMode === 'add';
+    const payload = {
+      TenPhong: $('#room-name').val(),
+      LoaiPhong: $('#room-type').val()
+    };
+    if (adding) {
+      payload.MaPhong = $('#room-id').val();
+      payload.SoGhe = Number($roomSeatCount.val());
+      if ($seatsPerRow.val() !== '') payload.SoGheMoiHang = Number($seatsPerRow.val());
     }
-    const room = roomById(selectedRoomId);
-    if (!room || roomMode !== 'editing') return;
-    if (rooms.some(item => item !== room && item.TenPhong.toLocaleLowerCase('vi') === name.toLocaleLowerCase('vi'))) {
-      showMessage('#room-message', 'Tên phòng đã được sử dụng.', true);
-      return;
-    }
-    room.TenPhong = name;
-    room.LoaiPhong = type;
-    selectRoom(room);
-    showMessage('#room-message', 'Đã cập nhật phòng trong phiên xem trang.');
+    change(adding ? 'POST' : 'PUT', adding ? api : roomUrl(), payload, $roomMessage, async saved => {
+      rooms = rooms.filter(item => item.MaPhong !== saved.MaPhong);
+      rooms.push(saved);
+      rooms.sort((a, b) => a.MaPhong.localeCompare(b.MaPhong));
+      showRoom(saved);
+      showMessage($roomMessage, adding ? 'Đã thêm phòng và ' + saved.SoGhe + ' ghế.' : 'Đã cập nhật phòng.');
+      if (adding) await loadSeats();
+    });
   });
 
   $('#delete-room').on('click', () => {
-    const room = roomById(selectedRoomId);
-    if (!room) return;
-    if (!window.confirm('Xóa ' + room.MaPhong + ' và toàn bộ ghế mẫu thuộc phòng này?')) return;
-    const deletedSeats = roomSeats(room.MaPhong);
-    for (const seat of deletedSeats) seats.splice(seats.indexOf(seat), 1);
-    rooms.splice(rooms.indexOf(room), 1);
-    selectRoom(null);
-    showMessage('#room-message', 'Đã xóa phòng và ' + deletedSeats.length + ' ghế mẫu trong phiên xem trang.');
+    if (!room || saving || !window.confirm('Xóa phòng ' + room.MaPhong + ' và toàn bộ ghế trong phòng?')) return;
+    change('DELETE', roomUrl(), null, $roomMessage, async () => {
+      rooms = rooms.filter(item => item.MaPhong !== room.MaPhong);
+      await selectRoom(null);
+      showMessage($roomMessage, 'Đã xóa phòng và các ghế thuộc phòng.');
+    });
   });
 
-  $('#clear-room').on('click', () => selectRoom(null));
+  $('#clear-room').on('click', () => {
+    selectRoom(null);
+    loadRooms();
+  });
 
   $('#add-seat').on('click', () => {
-    if (!selectedRoomId) return;
-    if (seatMode === 'adding') {
-      saveSeat();
-      return;
-    }
-    selectedSeatId = '';
-    resetSeatForm();
-    $('#seat-id').val(nextSeatId());
-    $('#seat-room').val(selectedRoomId);
-    $('#seat-row, #seat-number, #seat-status').prop('disabled', false);
-    $('#seat-status').val('Trong');
-    $('#add-seat').prop('disabled', true);
-    $('#add-seat').text('Lưu ghế');
-    seatMode = 'adding';
-    showMessage('#seat-message', 'Nhập hàng và số ghế rồi chọn Thêm.');
+    if (seatMode === 'add') return $seatForm[0].requestSubmit();
+    showMessage($seatMessage, '');
+    showSeat(null);
+    renderSeats();
+    seatMode = 'add';
+    $('#seat-id').attr('placeholder', 'Tự tạo khi lưu');
+    syncControls();
     $('#seat-row').trigger('focus');
   });
 
   $('#edit-seat').on('click', () => {
-    if (!selectedSeatId) return;
-    if (seatMode === 'editing') {
-      saveSeat();
-      return;
-    }
-    $('#seat-row, #seat-number, #seat-status').prop('disabled', false);
-    $('#edit-seat, #delete-seat, #add-seat').prop('disabled', true);
-    $('#edit-seat').prop('disabled', false).text('Lưu sửa');
-    seatMode = 'editing';
-    showMessage('#seat-message', 'Cập nhật vị trí hoặc trạng thái ghế rồi chọn Sửa.');
+    if (seatMode === 'edit') return $seatForm[0].requestSubmit();
+    showMessage($seatMessage, '');
+    seatMode = 'edit';
+    syncControls();
+    $('#seat-row').trigger('focus');
   });
 
-  function saveSeat() {
-    if (!selectedRoomId || !$('#seat-form')[0].reportValidity()) return;
-    const id = $('#seat-id').val();
-    const seat = seats.find(item => item.MaGhe === id);
-    const candidate = {
-      MaGhe: id,
-      MaPhong: selectedRoomId,
-      SoHang: $('#seat-row').val().trim().toUpperCase(),
-      SoGhe: Number($('#seat-number').val()),
-      TrangThai: $('#seat-status').val()
-    };
-    const duplicate = seats.some(item => item.MaPhong === candidate.MaPhong
-      && item.SoHang.toLocaleLowerCase('vi') === candidate.SoHang.toLocaleLowerCase('vi')
-      && Number(item.SoGhe) === candidate.SoGhe && item.MaGhe !== id);
-    if (duplicate) {
-      showMessage('#seat-message', 'Vị trí hàng và ghế này đã tồn tại trong phòng.', true);
-      return;
-    }
-    if (seatMode === 'adding') {
-      seats.push(candidate);
-      selectSeat(candidate);
-      renderRooms();
-      showMessage('#seat-message', 'Đã thêm ghế trong phiên xem trang.');
-    } else if (seatMode === 'editing' && seat) {
-      Object.assign(seat, candidate);
-      selectSeat(seat);
-      renderRooms();
-      showMessage('#seat-message', 'Đã cập nhật ghế trong phiên xem trang.');
-    }
-  }
+  $('#clear-seat').on('click', () => {
+    showMessage($seatMessage, '');
+    showSeat(null);
+    renderSeats();
+  });
 
-  $('#seat-form').on('submit', event => {
+  $seatForm.on('submit', event => {
     event.preventDefault();
-    saveSeat();
+    if (!room || !seatMode || saving || seatsLoading || !event.currentTarget.reportValidity()) return;
+    const adding = seatMode === 'add';
+    const payload = {
+      SoHang: $('#seat-row').val(),
+      SoGhe: Number($('#seat-number').val())
+    };
+    change(adding ? 'POST' : 'PUT', adding ? roomUrl() + '/ghe' : seatUrl(), payload, $seatMessage, async saved => {
+      showMessage($seatMessage, adding ? 'Đã thêm ghế.' : 'Đã cập nhật ghế.');
+      await loadSeats(saved.MaGhe);
+    });
   });
 
   $('#delete-seat').on('click', () => {
-    const seat = seats.find(item => item.MaGhe === selectedSeatId);
-    if (!seat) return;
-    if (!window.confirm('Xóa ghế ' + seat.MaGhe + '?')) return;
-    seats.splice(seats.indexOf(seat), 1);
-    selectedSeatId = '';
-    resetSeatForm();
-    renderSeats();
-    renderRooms();
-    showMessage('#seat-message', 'Đã xóa ghế trong phiên xem trang.');
+    if (!seat || saving || !window.confirm('Xóa ghế ' + seat.MaGhe + '?')) return;
+    change('DELETE', seatUrl(), null, $seatMessage, async () => {
+      showMessage($seatMessage, 'Đã xóa ghế.');
+      await loadSeats();
+    });
   });
 
-  selectRoom(null);
-  renderRooms();
-  setRoomMode('idle');
+  $('#logout-button').on('click', () => {
+    change('POST', '/api/auth/logout', null, $roomMessage, () => location.assign('dang-nhap.html'));
+  });
+
+  syncControls();
+  emptyRow($roomRows, 4, 'Đang tải phòng chiếu…');
+  $.getJSON('/api/auth/me').done(account => {
+    user = account;
+    $('#account-name').text(user.HoTen + ' · ' +
+      (user.VaiTro === 'QuanTriVien' ? 'Quản trị viên' : 'Nhân viên quầy'));
+    $('#logout-button').prop('hidden', false);
+    loadRooms();
+  }).fail(xhr => {
+    emptyRow($roomRows, 4, 'Không tải được thông tin tài khoản.');
+    showError($roomMessage, xhr);
+  });
 })();

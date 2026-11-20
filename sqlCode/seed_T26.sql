@@ -1,4 +1,4 @@
--- Du lieu kiem thu rieng. Chay sau addSample.sql va create_trigger.sql.
+-- Du lieu kiem thu rieng. Chay sau addSample.sql (va co the chay sau create_trigger.sql).
 -- Dung phong T26 de cach ly lich kiem thu khoi lich mau.
 START TRANSACTION;
 SET @NgayTest = '2099-06-01';
@@ -8,7 +8,6 @@ VALUES ('PC_T26', 'Phong kiem thu T26', 20, '2D');
 INSERT INTO Ghe (MaGhe, MaPhong, SoHang, SoGhe, LoaiGhe)
 SELECT CONCAT('T26_', MaGhe), 'PC_T26', SoHang, SoGhe, LoaiGhe
 FROM Ghe WHERE MaPhong = 'PC01';
-INSERT INTO GheBaoTri (MaGhe, MaPhong) VALUES ('T26_G010', 'PC_T26');
 
 INSERT INTO SuatChieu
     (MaSuatChieu, MaPhim, MaPhong, NgayChieu, GioBatDau, GioKetThuc, GiaVe)
@@ -20,9 +19,7 @@ VALUES
 INSERT INTO Ve (MaVe, MaSuatChieu, MaKhachHang, MaGhe, NgayDat, GiaVe)
 SELECT CONCAT('T26F_', RIGHT(g.MaGhe, 3)), 'T26_DAY', 'KH001', g.MaGhe, NOW(), 85000
 FROM Ghe g
-WHERE g.MaPhong = 'PC_T26' AND NOT EXISTS (
-    SELECT 1 FROM GheBaoTri bt WHERE bt.MaGhe = g.MaGhe AND bt.MaPhong = g.MaPhong
-);
+WHERE g.MaPhong = 'PC_T26';
 
 UPDATE Ve SET TrangThai = 'DaSuDung' WHERE MaVe = 'T26F_001';
 

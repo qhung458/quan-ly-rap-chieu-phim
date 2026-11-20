@@ -33,10 +33,10 @@ BEGIN
     UPDATE CauHinhHeThong SET GiaTri = 5 WHERE TenThamSo = 'PHUT_NGUNG_BAN';
     UPDATE CauHinhHeThong SET GiaTri = 60 WHERE TenThamSo = 'PHUT_NGUNG_HUY';
 
-    IF NOT (fn_SoGheTrong('SC047') <=> 17
-        AND fn_SoGheTrong('T26_TRONG') <=> 19
+    IF NOT (fn_SoGheTrong('SC047') <=> 18
+        AND fn_SoGheTrong('T26_TRONG') <=> 20
         AND fn_SoGheTrong('T26_DAY') <=> 0
-        AND fn_SoGheTrong('T26_HUY_BANLAI') <=> 18
+        AND fn_SoGheTrong('T26_HUY_BANLAI') <=> 19
         AND fn_SoGheTrong('KHONG_TON_TAI') IS NULL) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ket qua dem ghe khac mong doi.';
     END IF;
@@ -52,13 +52,7 @@ BEGIN
     CALL test_LenhBiTuChoi(
         "UPDATE Ghe SET MaPhong='PC06' WHERE MaGhe='T26_G001'", 'Khong the chuyen phong');
     CALL test_LenhBiTuChoi(
-        "INSERT INTO GheBaoTri VALUES ('T26_G001','PC_T26')", 'Ghe dang co ve hieu luc');
-    CALL test_LenhBiTuChoi(
-        "UPDATE GheBaoTri SET MaGhe='T26_G001' WHERE MaGhe='T26_G010'", 'Ghe dang co ve hieu luc');
-    CALL test_LenhBiTuChoi(
         "UPDATE Ve SET MaGhe='G001' WHERE MaVe='T26_BANLAI'", 'Ghe khong thuoc phong');
-    CALL test_LenhBiTuChoi(
-        "UPDATE Ve SET MaGhe='T26_G010' WHERE MaVe='T26_BANLAI'", 'Ghe dang bao tri');
     CALL test_LenhBiTuChoi(
         "INSERT INTO Ve (MaVe,MaSuatChieu,MaKhachHang,MaGhe,NgayDat)
          VALUES ('T26_DUP','T26_DAY','KH002','T26_G001',NOW())", 'Duplicate entry');
@@ -93,11 +87,6 @@ BEGIN
     IF NOT (fn_SoGheTrong('T26_TRONG') <=> 0) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Suat huy phai co 0 ghe co the dat.';
     END IF;
-
-    UPDATE SuatChieu SET TrangThai = 'Huy' WHERE MaSuatChieu = 'T26_DAY';
-    INSERT INTO GheBaoTri VALUES ('T26_G003', 'PC_T26');
-    CALL test_LenhBiTuChoi(
-        "UPDATE SuatChieu SET TrangThai='SapChieu' WHERE MaSuatChieu='T26_DAY'", 'tren ghe dang bao tri');
 
     ROLLBACK;
     SELECT 'DAT' AS KetQua;

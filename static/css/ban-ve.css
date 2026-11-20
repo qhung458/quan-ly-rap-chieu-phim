@@ -39,10 +39,18 @@
 
 .seat-map {
   display: grid;
-  grid-template-columns: 1.25rem repeat(10, minmax(2rem, 1fr));
+  grid-template-columns: minmax(1.5rem, max-content) repeat(var(--seat-columns, 1), minmax(2rem, 1fr));
   align-items: center;
   gap: 0.3rem;
-  min-width: 24.25rem;
+}
+
+.seat-map > p {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.ticket-layout > .detail-stack {
+  min-width: 0;
 }
 
 .seat-row-label {

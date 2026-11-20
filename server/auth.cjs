@@ -19,7 +19,7 @@ function requireLogin(req, res, next) {
 
 function requireAdmin(req, res, next) {
   if (req.session.user?.VaiTro !== 'QuanTriVien') {
-    return res.status(403).json({ message: 'Cần quyền quản trị để xóa khách hàng.' });
+    return res.status(403).json({ message: 'Cần quyền quản trị để thực hiện thao tác này.' });
   }
   next();
 }

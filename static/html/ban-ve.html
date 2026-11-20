@@ -20,7 +20,12 @@
       <a class="brand" href="dang-nhap.html"
         ><span aria-hidden="true">▶</span> Quản lý rạp chiếu phim</a
       >
-      <a class="header-link" href="dang-nhap.html">Tài khoản</a>
+      <div class="d-flex align-items-center gap-3">
+        <span id="account-name" class="small"></span>
+        <button class="btn btn-outline-dark btn-sm" id="logout-button" type="button" hidden>
+          Đăng xuất
+        </button>
+      </div>
     </header>
     <nav class="sidebar" aria-label="Điều hướng chính">
       <ul class="menu-list">
@@ -37,7 +42,7 @@
     <main class="main-content">
       <h1>Bán vé tại quầy</h1>
       <p class="page-description">
-        Chọn suất chiếu, ghế và khách hàng để bán vé tại quầy.
+        Chọn phim, suất chiếu, ghế và khách hàng để bán vé tại quầy.
       </p>
       <div class="ticket-layout">
         <div class="detail-stack">
@@ -84,15 +89,39 @@
                   class="form-control form-control-sm"
                   id="ticket-id"
                   name="MaVe"
+                  placeholder="Tự tạo khi lưu"
                   readonly
                 />
+                <label class="form-label" for="ticket-film">Phim</label>
+                <select class="form-select form-select-sm" id="ticket-film" disabled>
+                  <option value="">Chọn phim</option>
+                </select>
                 <label class="form-label" for="ticket-show">Suất chiếu</label>
                 <select
                   class="form-select form-select-sm"
                   id="ticket-show"
                   name="MaSuatChieu"
                   disabled
-                ></select>
+                >
+                  <option value="">Chọn phim trước</option>
+                </select>
+                <label class="form-label" for="ticket-room">Phòng chiếu</label>
+                <input class="form-control form-control-sm" id="ticket-room" type="text" readonly />
+                <label class="form-label" for="ticket-customer-search">Tìm khách hàng</label>
+                <div>
+                  <input
+                    class="form-control form-control-sm"
+                    id="ticket-customer-search"
+                    type="search"
+                    placeholder="Nhập mã, tên hoặc số điện thoại"
+                    maxlength="120"
+                    autocomplete="off"
+                    aria-controls="ticket-customer"
+                    aria-describedby="ticket-customer-search-status"
+                    disabled
+                  />
+                  <small class="text-secondary" id="ticket-customer-search-status" role="status"></small>
+                </div>
                 <label class="form-label" for="ticket-customer"
                   >Khách hàng</label
                 >
@@ -139,6 +168,14 @@
                   disabled
                 >
                   Lưu vé
+                </button>
+                <button
+                  class="btn btn-outline-dark btn-sm"
+                  id="move-ticket"
+                  type="button"
+                  disabled
+                >
+                  Đổi vé
                 </button>
                 <button
                   class="btn btn-outline-dark btn-sm"
@@ -217,9 +254,9 @@
               <thead>
                 <tr>
                   <th scope="col">Mã vé</th>
-                  <th scope="col">Mã suất</th>
                   <th scope="col">Mã KH</th>
-                  <th scope="col">Mã ghế</th>
+                  <th scope="col">Tên khách hàng</th>
+                  <th scope="col">Ghế</th>
                   <th scope="col">Ngày đặt</th>
                   <th scope="col">Giá vé</th>
                   <th scope="col">Trạng thái</th>
@@ -227,7 +264,7 @@
               </thead>
               <tbody id="ticket-rows">
                 <tr>
-                  <td colspan="7">Cần tải jQuery để xem dữ liệu mẫu.</td>
+                  <td colspan="7">Cần tải jQuery để kết nối với máy chủ.</td>
                 </tr>
               </tbody>
             </table>

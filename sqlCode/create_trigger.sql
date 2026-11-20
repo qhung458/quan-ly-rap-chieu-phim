@@ -14,12 +14,9 @@ DELIMITER //
 DROP TRIGGER IF EXISTS trg_Ve_BeforeInsert //
 DROP TRIGGER IF EXISTS trg_Ve_BeforeUpdate //
 DROP TRIGGER IF EXISTS trg_Ghe_BeforeUpdate //
-DROP TRIGGER IF EXISTS trg_GheBaoTri_BeforeInsert //
-DROP TRIGGER IF EXISTS trg_GheBaoTri_BeforeUpdate //
 DROP TRIGGER IF EXISTS trg_SuatChieu_BeforeInsert //
 DROP TRIGGER IF EXISTS trg_SuatChieu_BeforeUpdate //
 DROP PROCEDURE IF EXISTS usp_KiemTraDatVe //
-DROP PROCEDURE IF EXISTS usp_KiemTraBaoTriGhe //
 DROP PROCEDURE IF EXISTS usp_KiemTraLichPhong //
 
 CREATE PROCEDURE usp_KiemTraDatVe(
@@ -48,12 +45,6 @@ BEGIN
     IF v_TrangThaiSuat <> 'SapChieu' THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Suat chieu khong mo ban ve.';
     END IF;
-    IF EXISTS (
-        SELECT 1 FROM GheBaoTri WHERE MaGhe = p_MaGhe AND MaPhong = v_PhongGhe FOR SHARE
-    ) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong the dat ghe dang bao tri.';
-    END IF;
-
     SELECT COALESCE(MAX(GiaTri), 5) INTO v_PhutBan
       FROM CauHinhHeThong WHERE TenThamSo = 'PHUT_NGUNG_BAN';
     IF v_BatDau <= NOW() OR v_BatDau < DATE_ADD(NOW(), INTERVAL v_PhutBan MINUTE) THEN
@@ -118,41 +109,6 @@ BEGIN
     END IF;
 END //
 
-CREATE PROCEDURE usp_KiemTraBaoTriGhe(IN p_MaGhe VARCHAR(15), IN p_MaPhong VARCHAR(10))
-BEGIN
-    DECLARE v_MaGhe VARCHAR(15);
-    SELECT MaGhe INTO v_MaGhe
-      FROM Ghe WHERE MaGhe = p_MaGhe AND MaPhong = p_MaPhong FOR UPDATE;
-
-    IF EXISTS (
-        SELECT 1
-        FROM Ve v JOIN SuatChieu sc ON sc.MaSuatChieu = v.MaSuatChieu
-        WHERE v.MaGhe = p_MaGhe AND v.TrangThai IN ('DaDat', 'DaSuDung')
-          AND sc.TrangThai NOT IN ('Huy', 'KetThuc')
-          AND TIMESTAMP(
-              DATE_ADD(sc.NgayChieu, INTERVAL (sc.GioKetThuc < sc.GioBatDau) DAY),
-              sc.GioKetThuc
-          ) > NOW()
-        FOR SHARE
-    ) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ghe dang co ve hieu luc, khong the bao tri.';
-    END IF;
-END //
-
-CREATE TRIGGER trg_GheBaoTri_BeforeInsert
-BEFORE INSERT ON GheBaoTri FOR EACH ROW
-BEGIN
-    CALL usp_KiemTraBaoTriGhe(NEW.MaGhe, NEW.MaPhong);
-END //
-
-CREATE TRIGGER trg_GheBaoTri_BeforeUpdate
-BEFORE UPDATE ON GheBaoTri FOR EACH ROW
-BEGIN
-    IF NEW.MaGhe <> OLD.MaGhe OR NEW.MaPhong <> OLD.MaPhong THEN
-        CALL usp_KiemTraBaoTriGhe(NEW.MaGhe, NEW.MaPhong);
-    END IF;
-END //
-
 CREATE PROCEDURE usp_KiemTraLichPhong(
     IN p_MaPhong VARCHAR(10),
     IN p_Ngay DATE,
@@ -209,21 +165,6 @@ BEGIN
         OR NEW.GioBatDau <> OLD.GioBatDau OR NEW.GioKetThuc <> OLD.GioKetThuc
     ) THEN
         CALL usp_KiemTraLichPhong(NEW.MaPhong, NEW.NgayChieu, NEW.GioBatDau, NEW.GioKetThuc, OLD.MaSuatChieu);
-    END IF;
-
-    IF NEW.TrangThai NOT IN ('Huy', 'KetThuc') AND (
-        OLD.TrangThai IN ('Huy', 'KetThuc') OR NEW.NgayChieu <> OLD.NgayChieu
-        OR NEW.GioBatDau <> OLD.GioBatDau OR NEW.GioKetThuc <> OLD.GioKetThuc
-    ) AND TIMESTAMP(
-        DATE_ADD(NEW.NgayChieu, INTERVAL (NEW.GioKetThuc < NEW.GioBatDau) DAY),
-        NEW.GioKetThuc
-    ) > NOW() AND EXISTS (
-        SELECT 1
-        FROM Ve v JOIN GheBaoTri bt ON bt.MaGhe = v.MaGhe AND bt.MaPhong = NEW.MaPhong
-        WHERE v.MaSuatChieu = OLD.MaSuatChieu AND v.TrangThai IN ('DaDat', 'DaSuDung')
-        FOR SHARE
-    ) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Suat chieu co ve hieu luc tren ghe dang bao tri.';
     END IF;
 END //
 DELIMITER ;

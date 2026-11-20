@@ -20,7 +20,12 @@
       <a class="brand" href="dang-nhap.html"
         ><span aria-hidden="true">▶</span> Quản lý rạp chiếu phim</a
       >
-      <a class="header-link" href="dang-nhap.html">Tài khoản</a>
+      <div class="d-flex align-items-center gap-3">
+        <span id="account-name" class="small"></span>
+        <button class="btn btn-outline-dark btn-sm" id="logout-button" type="button" hidden>
+          Đăng xuất
+        </button>
+      </div>
     </header>
     <nav class="sidebar" aria-label="Điều hướng chính">
       <ul class="menu-list">
@@ -41,7 +46,7 @@
     <main class="main-content">
       <h1>Phòng chiếu và ghế</h1>
       <p class="page-description">
-        Quản lý phòng chiếu và sơ đồ ghế thuộc phòng đã chọn.
+        Quản lý phòng chiếu và vị trí ghế trong từng phòng.
       </p>
       <div class="room-seat-layout">
         <div class="detail-stack">
@@ -56,6 +61,8 @@
                   name="MaPhong"
                   type="text"
                   maxlength="10"
+                  pattern="[A-Za-z0-9_\-]{1,10}"
+                  title="Chỉ dùng chữ Latin, số, dấu gạch dưới hoặc gạch ngang."
                   required
                 />
                 <label class="form-label" for="room-name">Tên phòng</label>
@@ -77,6 +84,17 @@
                   max="130"
                   required
                 />
+                <label class="form-label" for="room-seats-per-row" hidden>Ghế mỗi hàng</label>
+                <input
+                  class="form-control form-control-sm"
+                  id="room-seats-per-row"
+                  name="SoGheMoiHang"
+                  type="number"
+                  min="1"
+                  placeholder="Để trống để xếp một hàng"
+                  hidden
+                  disabled
+                />
                 <label class="form-label" for="room-type">Loại phòng</label>
                 <select
                   class="form-select form-select-sm"
@@ -89,7 +107,7 @@
                 </select>
               </div>
               <div class="d-flex flex-wrap gap-2">
-                <button class="btn btn-dark btn-sm" id="add-room" type="button">
+                <button class="btn btn-dark btn-sm" id="add-room" type="button" disabled>
                   Thêm
                 </button>
                 <button
@@ -120,6 +138,7 @@
                   class="btn btn-outline-secondary btn-sm"
                   id="clear-room"
                   type="button"
+                  disabled
                 >
                   Làm mới
                 </button>
@@ -158,7 +177,7 @@
                 </thead>
                 <tbody id="room-rows">
                   <tr>
-                    <td colspan="4">Cần tải jQuery để xem dữ liệu mẫu.</td>
+                    <td colspan="4">Cần tải jQuery để kết nối với máy chủ.</td>
                   </tr>
                 </tbody>
               </table>
@@ -180,7 +199,6 @@
                   name="MaGhe"
                   type="text"
                   maxlength="15"
-                  required
                   readonly
                 />
                 <label class="form-label" for="seat-room">Mã phòng</label>
@@ -191,7 +209,7 @@
                   type="text"
                   readonly
                 />
-                <label class="form-label" for="seat-row">Số hàng</label>
+                <label class="form-label" for="seat-row">Hàng ghế</label>
                 <input
                   class="form-control form-control-sm"
                   id="seat-row"
@@ -207,19 +225,9 @@
                   name="SoGhe"
                   type="number"
                   min="1"
+                  max="2147483647"
                   required
                 />
-                <label class="form-label" for="seat-status">Trạng thái</label>
-                <select
-                  class="form-select form-select-sm"
-                  id="seat-status"
-                  name="TrangThai"
-                  required
-                >
-                  <option value="Trong">Trống</option>
-                  <option value="DaDat">Đã đặt</option>
-                  <option value="BaoTri">Bảo trì</option>
-                </select>
               </div>
               <div class="d-flex flex-wrap gap-2">
                 <button
@@ -245,6 +253,9 @@
                   disabled
                 >
                   Xóa
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" id="clear-seat" type="button" disabled>
+                  Bỏ chọn / Hủy
                 </button>
               </div>
               <p
@@ -277,12 +288,11 @@
                     <th scope="col">Mã phòng</th>
                     <th scope="col">Hàng</th>
                     <th scope="col">Ghế</th>
-                    <th scope="col">Trạng thái</th>
                   </tr>
                 </thead>
                 <tbody id="seat-rows">
                   <tr>
-                    <td colspan="5">Chọn một phòng để xem danh sách ghế.</td>
+                    <td colspan="4">Chọn một phòng để xem danh sách ghế.</td>
                   </tr>
                 </tbody>
               </table>

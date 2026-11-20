@@ -1,4 +1,4 @@
-# Chạy phần Đăng nhập và Khách hàng
+# Chạy ứng dụng quản lý rạp chiếu phim
 
 Dùng Node.js 24 và MySQL 8.0. Mở PowerShell tại thư mục `quanLyRapChieuPhim`.
 
@@ -12,7 +12,7 @@ Dùng Node.js 24 và MySQL 8.0. Mở PowerShell tại thư mục `quanLyRapChieu
    ```
 
 4. Điền `DB_NAME`, `DB_USER`, `DB_PASSWORD` theo kết nối Workbench. Dán chuỗi ngẫu nhiên vào `SESSION_SECRET`. Dùng dấu nháy kép quanh mật khẩu nếu chứa dấu `#` hoặc khoảng trắng. Giữ `.env` ở máy anh.
-5. Chạy `npm start`, rồi mở [trang đăng nhập](http://127.0.0.1:3000). Hai trang tải Bootstrap và jQuery qua CDN. Mở [trang kiểm tra kết nối](http://127.0.0.1:3000/api/health) để xác nhận API trả `{"ok":true}`.
+5. Chạy `npm start`, rồi mở [trang đăng nhập](http://127.0.0.1:3000). Giao diện tải Bootstrap và jQuery qua CDN. Mở [trang kiểm tra kết nối](http://127.0.0.1:3000/api/health) để xác nhận API trả `{"ok":true}`.
 
 ## Tài khoản demo
 
@@ -28,6 +28,23 @@ WHERE TenDangNhap = 'admin_demo';
 
 Đăng nhập lại sau khi cấp quyền. Khách hàng có vé hoặc hóa đơn sẽ được MySQL giữ lại theo khóa ngoại.
 
+## Phòng chiếu và ghế
+
+Sau khi đăng nhập, chọn **Phòng chiếu và ghế** trong thanh điều hướng. Nhân viên có thể thêm và sửa phòng hoặc ghế. Quản trị viên có thêm quyền xóa.
+
+- Khi tạo phòng, nhập **Ghế mỗi hàng** để chia ghế theo hàng A, B, …, Z, AA, … Để trống để xếp tất cả ghế vào hàng A. Số ghế của phòng được cập nhật khi thêm hoặc xóa ghế.
+- Ghế tạo tự động và ghế thêm thủ công đều dùng chung dãy mã `G001`, `G002`, … cho toàn bộ rạp. Mã mới tiếp theo mã số lớn nhất đang có.
+- Số ghế trống được tính theo vé của từng suất chiếu. Vé đã hủy giải phóng chỗ.
+- Phòng đã có suất chiếu không thể xóa. Ghế đã có lịch sử vé không thể xóa hoặc đổi vị trí.
+
+## Bán vé
+
+Sau khi đăng nhập, mở **Bán vé**, chọn phim rồi chọn một suất còn mở bán của phim đó. Chọn khách hàng và một ghế trống rồi lưu. Nhập mã, tên (có dấu hoặc không dấu) hoặc số điện thoại vào **Tìm khách hàng** để lọc danh sách chọn. Sơ đồ lấy ghế của phòng trong MySQL. Vé đã bán có thể tra cứu theo mã vé hoặc mã khách hàng trong suất đang chọn.
+
+- **Đổi vé** cho phép chọn ghế mới hoặc suất khác còn mở bán. Đổi ghế trong cùng suất giữ giá đã lưu. Đổi sang suất khác dùng giá của suất mới.
+- **Hủy vé** giữ bản ghi lịch sử và giải phóng ghế. Thời hạn bán, đổi và hủy lấy từ `CauHinhHeThong`, mặc định là 5 phút trước giờ chiếu để bán và 60 phút để đổi hoặc hủy.
+- Schema cần có các quy tắc trong `sqlCode/create_trigger.sql`. Danh sách chọn chỉ hiện suất `SapChieu` còn thời hạn bán. Có thể xem vé của các suất đã qua trong lịch sử mua vé ở trang **Khách hàng**.
+
 ## Dựng schema mới để thử
 
 Tạo một schema mới nếu cần thử toàn bộ bộ dữ liệu. Chạy theo thứ tự:
@@ -40,4 +57,4 @@ Tạo một schema mới nếu cần thử toàn bộ bộ dữ liệu. Chạy t
 6. `create_function.sql`
 7. `create_tai_khoan.sql`
 
-Chạy `test_function.sql` để đối chiếu T26 và `NormalQuery.sql` để đối chiếu T33. Cấu hình ứng dụng chạy cục bộ trên `127.0.0.1`. Phiên đăng nhập sẽ hết khi khởi động lại Node.js.
+Chạy `test_function.sql` để đối chiếu T26 trên schema mới và `NormalQuery.sql` để đối chiếu T33. Nếu dùng dữ liệu mẫu từ phiên bản trước, suất `T26_DAY` có thể vẫn còn 1 ghế trống theo dữ liệu vé đã nạp. Cấu hình ứng dụng chạy cục bộ trên `127.0.0.1`. Phiên đăng nhập sẽ hết khi khởi động lại Node.js.
