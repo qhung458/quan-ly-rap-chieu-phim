@@ -6,6 +6,8 @@ const { router: auth } = require('./auth.cjs');
 const customers = require('./customers.cjs');
 const rooms = require('./rooms.cjs');
 const tickets = require('./tickets.cjs');
+const movies = require('./movies.cjs');
+const showtimes = require('./showtimes.cjs');
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -46,6 +48,8 @@ app.use('/api/auth', auth);
 app.use('/api/khach-hang', customers);
 app.use('/api/phong-chieu', rooms);
 app.use('/api/ban-ve', tickets);
+app.use('/api/phim', movies);
+app.use('/api/suat-chieu', showtimes);
 app.use('/api', (_req, res) => res.status(404).json({ message: 'Không tìm thấy API.' }));
 
 app.get('/', (_req, res) => res.redirect('/html/dang-nhap.html'));
