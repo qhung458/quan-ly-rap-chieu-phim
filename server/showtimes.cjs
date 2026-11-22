@@ -1,4 +1,3 @@
-
 const express = require('express');
 const db = require('./db.cjs');
 const { requireLogin, requireAdmin } = require('./auth.cjs');
