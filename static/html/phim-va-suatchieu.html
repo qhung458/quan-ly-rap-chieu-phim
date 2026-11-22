@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý rạp chiếu phim</title>
+    <link rel="stylesheet" href="../css/phim-va-suatchieu.css">
+</head>
+<body>
+    <div class="app">
+        <header class="topbar">
+            <div class="top-links">
+                <a href="#" id="accountLink">Tài khoản</a>
+                <a href="#" id="backLink">Trở về</a>
+                <a href="#" id="logoutLink">Thoát</a>
+            </div>
+            <span>Wireframe – Hệ thống quản lý rạp chiếu phim</span>
+        </header>
+
+        <div class="main-layout">
+            <aside class="sidebar">
+                <button class="nav-item" data-page="login"><span class="nav-icon"></span>Đăng nhập</button>
+                <button class="nav-item active" data-page="movies"><span class="nav-icon"></span>Phim</button>
+                <button class="nav-item" data-page="rooms"><span class="nav-icon"></span>Phòng chiếu và ghế</button>
+                <button class="nav-item" data-page="showtimes"><span class="nav-icon"></span>Suất chiếu</button>
+                <button class="nav-item" data-page="tickets"><span class="nav-icon"></span>Bán vé</button>
+                <button class="nav-item" data-page="customers"><span class="nav-icon"></span>Khách hàng</button>
+                <button class="nav-item" data-page="food"><span class="nav-icon"></span>Bắp nước và hóa đơn</button>
+                <button class="nav-item" data-page="reports"><span class="nav-icon"></span>Thống kê</button>
+            </aside>
+
+            <main class="content">
+                <!-- MÀN HÌNH PHIM -->
+                <section id="moviesPage" class="page">
+                    <div class="page-heading">
+                        <h1>Danh sách phim</h1>
+                        <p>Bảng Phim: mã phim, tên, thể loại, đạo diễn, thời lượng, ngày khởi chiếu, độ tuổi cho phép</p>
+                    </div>
+
+                    <div class="movie-layout">
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Mã phim</th><th>Tên phim</th><th>Thể loại</th>
+                                        <th>Đạo diễn</th><th>Thời lượng</th><th>Khởi chiếu</th>
+                                        <th>Độ tuổi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="movieTable"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="right-column">
+                            <fieldset>
+                                <legend>Thông tin phim</legend>
+                                <form id="movieForm">
+                                    <div class="form-row"><label for="movieId">Mã phim</label><input id="movieId" required></div>
+                                    <div class="form-row"><label for="movieName">Tên phim</label><input id="movieName" required></div>
+                                    <div class="form-row">
+                                        <label for="movieGenre">Thể loại</label>
+                                        <input id="movieGenre" required maxlength="100">
+                                    </div>
+                                    <div class="form-row"><label for="movieDirector">Đạo diễn</label><input id="movieDirector" required></div>
+                                    <div class="form-row"><label for="movieDuration">Thời lượng (phút)</label><input id="movieDuration" type="number" min="1" required></div>
+                                    <div class="form-row"><label for="movieDate">Ngày khởi chiếu</label><input id="movieDate" type="date" required></div>
+                                    <div class="form-row">
+                                        <label for="movieAge">Độ tuổi cho phép</label>
+                                        <select id="movieAge" required>
+                                            <option value="">--Chọn--</option>
+                                            <option value="0">P</option>
+                                            <option value="13">T13</option>
+                                            <option value="16">T16</option>
+                                            <option value="18">T18</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-actions">
+                                        <button type="button" id="addMovie">Thêm</button>
+                                        <button type="submit">Lưu</button>
+                                        <button type="button" id="editMovie">Sửa</button>
+                                        <button type="button" id="deleteMovie">Xóa</button>
+                                        <button type="button" id="resetMovie">Làm mới</button>
+                                    </div>
+                                </form>
+                            </fieldset>
+
+                            <fieldset>
+                                <legend>Tìm kiếm</legend>
+                                <div class="form-row"><label for="searchMovieName">Tên phim</label><input id="searchMovieName"></div>
+                                <div class="form-row"><label for="searchMovieGenre">Thể loại</label>
+                                    <select id="searchMovieGenre">
+                                        <option value="">--Tất cả--</option><option>Hành động</option><option>Hoạt hình</option>
+                                        <option>Kinh dị</option><option>Tình cảm</option><option>Tâm lý</option><option>Gia đình</option><option>Hài</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-actions">
+                                    <button type="button" id="searchMovie">Tìm kiếm</button>
+                                    <button type="button" id="clearMovieSearch">Hủy tìm kiếm</button>
+                                </div>
+                            </fieldset>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- MÀN HÌNH SUẤT CHIẾU -->
+                <section id="showtimesPage" class="page hidden">
+                    <div class="page-heading">
+                        <h1>Suất chiếu</h1>
+                        <p>Bảng Suất chiếu; lọc theo phim và ngày chiếu</p>
+                    </div>
+
+                    <fieldset class="filter-box">
+                        <legend>Lọc suất chiếu</legend>
+                        <div class="filter-controls">
+                            <label for="filterMovie">Phim</label>
+                            <select id="filterMovie"><option value="">--Tất cả phim--</option></select>
+                            <label for="filterDate">Ngày chiếu</label>
+                            <input type="date" id="filterDate">
+                            <button type="button" id="filterShowtimes">Xem suất chiếu</button>
+                            <button type="button" id="clearShowtimeFilter">Hủy lọc</button>
+                        </div>
+                    </fieldset>
+
+                    <div class="showtime-layout">
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Mã suất</th><th>Mã phim</th><th>Mã phòng</th>
+                                        <th>Ngày chiếu</th><th>Giờ bắt đầu</th><th>Giờ kết thúc</th>
+                                        <th>Giá vé</th><th>Trạng thái</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="showtimeTable"></tbody>
+                            </table>
+                        </div>
+
+                        <fieldset class="showtime-form-box">
+                            <legend>Thông tin suất chiếu</legend>
+                            <form id="showtimeForm">
+                                <div class="form-row"><label for="showtimeId">Mã suất chiếu</label><input id="showtimeId" required></div>
+                                <div class="form-row"><label for="showtimeMovie">Phim</label><select id="showtimeMovie" required></select></div>
+                                <div class="form-row"><label for="showtimeRoom">Phòng chiếu</label>
+                                    <select id="showtimeRoom" required><option value="">--Chọn phòng--</option><option>PC01</option><option>PC02</option><option>PC03</option><option>PC04</option></select>
+                                </div>
+                                <div class="form-row"><label for="showtimeDate">Ngày chiếu</label><input type="date" id="showtimeDate" required></div>
+                                <div class="form-row"><label for="showtimeStart">Giờ bắt đầu</label><input type="time" id="showtimeStart" required></div>
+                                <div class="form-row"><label for="showtimeEnd">Giờ kết thúc</label><input type="time" id="showtimeEnd" readonly></div>
+                                <div class="form-row"><label for="showtimePrice">Giá vé (VNĐ)</label><input type="number" id="showtimePrice" min="0" required></div>
+                                <div class="form-row"><label for="showtimeStatus">Trạng thái</label>
+                                    <select id="showtimeStatus"><option>Sắp chiếu</option><option>Đang chiếu</option><option>Kết thúc</option><option>Hủy</option></select>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" id="addShowtime">Thêm</button>
+                                    <button type="submit">Lưu</button>
+                                    <button type="button" id="editShowtime">Sửa</button>
+                                    <button type="button" id="deleteShowtime">Xóa</button>
+                                    <button type="button" id="resetShowtime">Làm mới</button>
+                                </div>
+                            </form>
+                        </fieldset>
+                    </div>
+                </section>
+
+                <section id="placeholderPage" class="page hidden">
+                    <div class="page-heading">
+                        <h1 id="placeholderTitle">Chức năng</h1>
+                        <p>...</p>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+    <script src="../js/phim-va-suat-chieu.js"></script>
+</body>
+</html>
