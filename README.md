@@ -45,6 +45,20 @@ Sau khi đăng nhập, mở **Bán vé**, chọn phim rồi chọn một suất 
 - **Hủy vé** giữ bản ghi lịch sử và giải phóng ghế. Thời hạn bán, đổi và hủy lấy từ `CauHinhHeThong`, mặc định là 5 phút trước giờ chiếu để bán và 60 phút để đổi hoặc hủy.
 - Schema cần có các quy tắc trong `sqlCode/create_trigger.sql`. Danh sách chọn chỉ hiện suất `SapChieu` còn thời hạn bán. Có thể xem vé của các suất đã qua trong lịch sử mua vé ở trang **Khách hàng**.
 
+## Bắp nước và hóa đơn
+
+Mở **Bắp nước và hóa đơn** trong thanh điều hướng. Nhân viên thêm và sửa combo, lập hóa đơn và xem chi tiết. Quản trị viên có thêm quyền xóa combo và xóa hóa đơn.
+
+- Bảng `HoaDon` lưu mỗi combo thành một dòng, nên một hóa đơn nhiều combo là nhiều dòng cùng `MaHoaDon`. Mã hóa đơn tự tăng theo dạng `HD001`, `HD002`, …
+- Máy chủ tự tính `TongTien` = giá combo trong MySQL × số lượng. Đổi giá combo sau đó không làm thay đổi hóa đơn cũ.
+- Combo đã có trong hóa đơn không thể xóa (khóa ngoại). Hóa đơn nhập trùng combo được gộp số lượng.
+
+## Thống kê
+
+Mở **Thống kê**, chọn khoảng ngày (tối đa 366 ngày, mặc định 30 ngày gần nhất). Trang hiển thị tổng doanh thu vé và bắp nước, doanh thu theo ngày hoặc tháng, theo phim và theo combo.
+
+- Doanh thu vé tính theo ngày chiếu, loại vé đã hủy và suất bị hủy (cùng quy ước với `NormalQuery.sql`). Doanh thu bắp nước tính theo ngày lập hóa đơn.
+
 ## Dựng schema mới để thử
 
 Tạo một schema mới nếu cần thử toàn bộ bộ dữ liệu. Chạy theo thứ tự:

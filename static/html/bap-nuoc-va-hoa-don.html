@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bắp nước và hóa đơn | Quản lý rạp chiếu phim</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <link rel="stylesheet" href="../css/rap-chieu-phim.css">
+    <link rel="stylesheet" href="../css/bap-nuoc-va-hoa-don.css">
+  </head>
+  <body class="app-layout">
+    <header class="app-header d-flex align-items-center justify-content-between gap-3">
+      <a class="brand" href="dang-nhap.html"><span aria-hidden="true">▶</span> Quản lý rạp chiếu phim</a>
+      <div class="d-flex align-items-center gap-3">
+        <span id="account-name" class="small"></span>
+        <button id="logout-button" class="btn btn-outline-dark btn-sm" type="button" hidden>Đăng xuất</button>
+      </div>
+    </header>
+    <nav class="sidebar" aria-label="Điều hướng chính">
+      <ul class="menu-list">
+        <li><a href="dang-nhap.html">Đăng nhập</a></li>
+        <li><span aria-disabled="true">Phim</span></li>
+        <li><a href="phong-chieu-va-ghe.html">Phòng chiếu và ghế</a></li>
+        <li><span aria-disabled="true">Suất chiếu</span></li>
+        <li><a href="ban-ve.html">Bán vé</a></li>
+        <li><a href="khach-hang.html">Khách hàng</a></li>
+        <li><a href="bap-nuoc-va-hoa-don.html" aria-current="page">Bắp nước và hóa đơn</a></li>
+        <li><a href="thong-ke.html">Thống kê</a></li>
+      </ul>
+    </nav>
+    <main class="main-content">
+      <h1>Bắp nước và hóa đơn</h1>
+      <p class="page-description">Quản lý danh mục combo bắp nước và lập hóa đơn cho khách hàng.</p>
+      <div class="food-layout">
+        <div class="detail-stack">
+          <section class="panel" aria-labelledby="invoice-new-title">
+            <h2 id="invoice-new-title">Lập hóa đơn</h2>
+            <form id="invoice-form" class="form-stack" novalidate>
+              <label class="form-label" for="customer-search">Tìm khách hàng</label>
+              <input class="form-control" id="customer-search" type="search" placeholder="Mã, tên hoặc số điện thoại" disabled>
+              <label class="form-label" for="invoice-customer">Khách hàng</label>
+              <select class="form-select" id="invoice-customer" required disabled></select>
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="form-label mb-0">Combo</span>
+                <button class="btn btn-outline-dark btn-sm" id="add-line" type="button" disabled>Thêm dòng</button>
+              </div>
+              <div id="invoice-lines" class="invoice-lines"></div>
+              <p class="invoice-total">Tổng thanh toán: <strong id="invoice-total">0 ₫</strong></p>
+              <button class="btn btn-dark" id="invoice-submit" type="submit" disabled>Lưu hóa đơn</button>
+              <p class="form-message" id="invoice-message" role="status"></p>
+            </form>
+          </section>
+          <section class="panel" aria-labelledby="combo-form-title">
+            <h2 id="combo-form-title">Thông tin combo</h2>
+            <form id="combo-form" class="form-stack">
+              <label class="form-label" for="combo-id">Mã combo</label>
+              <input class="form-control" id="combo-id" name="MaCombo" type="text" maxlength="10" required>
+              <label class="form-label" for="combo-name">Tên combo</label>
+              <input class="form-control" id="combo-name" name="TenCombo" type="text" maxlength="100" required>
+              <label class="form-label" for="combo-price">Giá (₫)</label>
+              <input class="form-control" id="combo-price" name="GiaCombo" type="number" min="0" max="100000000" step="1000" required>
+              <label class="form-label" for="combo-desc">Mô tả</label>
+              <input class="form-control" id="combo-desc" name="MoTa" type="text" maxlength="255">
+              <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-dark" type="submit" name="ThaoTac" value="them" disabled>Thêm</button>
+                <button class="btn btn-outline-dark" type="submit" name="ThaoTac" value="sua" disabled>Sửa</button>
+                <button class="btn btn-outline-dark" id="delete-combo" type="button" disabled>Xóa</button>
+                <button class="btn btn-outline-secondary" id="clear-combo" type="button" disabled>Làm mới</button>
+              </div>
+              <p class="form-message" id="combo-message" role="status"></p>
+            </form>
+          </section>
+        </div>
+        <div class="detail-stack">
+          <section class="panel" aria-labelledby="combos-title">
+            <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+              <h2 id="combos-title" class="mb-0">Danh mục combo</h2>
+              <span id="combo-count" class="text-secondary small" role="status"></span>
+            </div>
+            <label class="visually-hidden" for="combo-search">Tìm combo</label>
+            <input class="form-control mb-3" type="search" id="combo-search" placeholder="Mã, tên hoặc mô tả combo" disabled>
+            <div class="table-responsive">
+              <table class="table align-middle customer-table mb-0" aria-labelledby="combos-title">
+                <thead>
+                  <tr>
+                    <th scope="col">Mã</th>
+                    <th scope="col">Tên combo</th>
+                    <th scope="col" class="text-end">Giá</th>
+                    <th scope="col" class="text-end">Đã bán</th>
+                  </tr>
+                </thead>
+                <tbody id="combo-rows"><tr><td colspan="4">Đang tải danh mục combo…</td></tr></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="panel" aria-labelledby="invoices-title">
+            <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+              <h2 id="invoices-title" class="mb-0">Hóa đơn</h2>
+              <span id="invoice-count" class="text-secondary small" role="status"></span>
+            </div>
+            <div class="invoice-filter">
+              <input class="form-control" type="search" id="invoice-search" aria-label="Tìm hóa đơn" placeholder="Mã hóa đơn, khách hàng" disabled>
+              <input class="form-control" type="date" id="invoice-from" aria-label="Từ ngày" disabled>
+              <input class="form-control" type="date" id="invoice-to" aria-label="Đến ngày" disabled>
+            </div>
+            <div class="table-responsive">
+              <table class="table align-middle customer-table mb-0" aria-labelledby="invoices-title">
+                <thead>
+                  <tr>
+                    <th scope="col">Mã HĐ</th>
+                    <th scope="col">Khách hàng</th>
+                    <th scope="col">Ngày mua</th>
+                    <th scope="col" class="text-end">Tổng tiền</th>
+                  </tr>
+                </thead>
+                <tbody id="invoice-rows"><tr><td colspan="4">Đang tải hóa đơn…</td></tr></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="panel" aria-labelledby="invoice-detail-title">
+            <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+              <h2 id="invoice-detail-title" class="mb-0">Chi tiết hóa đơn</h2>
+              <button class="btn btn-outline-dark btn-sm" id="delete-invoice" type="button" hidden>Xóa hóa đơn</button>
+            </div>
+            <div id="invoice-detail"><p class="text-secondary mb-0">Chọn một hóa đơn để xem chi tiết.</p></div>
+          </section>
+        </div>
+      </div>
+    </main>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="../js/bap-nuoc-va-hoa-don.js"></script>
+  </body>
+</html>

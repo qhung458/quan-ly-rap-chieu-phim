@@ -1,0 +1,101 @@
+.stats-filter {
+  margin-bottom: 1.5rem;
+}
+
+.stats-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: end;
+}
+
+.stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-tile {
+  padding: 1rem 1.25rem;
+  border: 1px solid #dce0e5;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.stat-tile.is-total {
+  background: #262c36;
+  border-color: #262c36;
+  color: #fff;
+}
+
+.stat-label {
+  margin: 0 0 0.25rem;
+  font-size: 0.8rem;
+  color: #646c79;
+}
+
+.is-total .stat-label {
+  color: #d5d9e0;
+}
+
+.stat-value {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.stat-sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: #646c79;
+}
+
+.is-total .stat-sub {
+  color: #d5d9e0;
+}
+
+.stats-grid {
+  display: grid;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.stats-scroll {
+  max-height: 32rem;
+  overflow: auto;
+}
+
+.bar-cell {
+  min-width: 9rem;
+}
+
+.bar-track {
+  height: 6px;
+  margin-top: 0.3rem;
+  border-radius: 3px;
+  background: #e9ecf0;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: #314766;
+}
+
+.money {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.stats-note {
+  margin: 1rem 0 0;
+  font-size: 0.8rem;
+  color: #646c79;
+}
+
+@media (min-width: 1200px) {
+  .stats-grid {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  }
+}
