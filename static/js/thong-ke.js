@@ -100,16 +100,25 @@
     const from = $('#stats-from').val();
     const to = $('#stats-to').val();
     if (!from || !to || from > to) {
+      $submit.prop('disabled', false);
       $message.addClass('text-danger').text('Chọn khoảng ngày hợp lệ: từ ngày không được sau đến ngày.');
       return;
     }
 
     $submit.prop('disabled', true);
+    $message.text('Đang tải thống kê…');
     try {
-      const result = await $.getJSON('/api/thong-ke', { tuNgay: from, denNgay: to });
+      const result = await $.ajax({
+        url: '/api/thong-ke',
+        data: { tuNgay: from, denNgay: to },
+        dataType: 'json',
+        cache: false
+      });
       if (current !== version) return;
       data = result;
       render();
+      const formatDate = date => date.split('-').reverse().join('/');
+      $message.text('Đang hiển thị từ ' + formatDate(result.TuNgay) + ' đến ' + formatDate(result.DenNgay) + '.');
     } catch (xhr) {
       if (current !== version) return;
       showError(xhr);
@@ -131,6 +140,7 @@
     event.preventDefault();
     load();
   });
+  $('#stats-from, #stats-to').on('change', load);
   $('#by-day').on('click', () => setMode('day'));
   $('#by-month').on('click', () => setMode('month'));
   $('#logout-button').on('click', async () => {
