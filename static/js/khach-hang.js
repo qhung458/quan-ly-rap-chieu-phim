@@ -18,6 +18,18 @@
   let historyVersion = 0;
   let searchTimer;
 
+  let visibleCustomers = [];
+  const enableCustomerExport = ExcelExport.bind('customers-export', () => ({
+    filename: 'khach-hang',
+    sheets: [{
+      name: 'Khách hàng',
+      columns: [['Mã khách hàng', 18], ['Họ và tên', 30], ['Số điện thoại', 20], ['Email', 38]],
+      rows: visibleCustomers.map(customer => [
+        customer.MaKhachHang, customer.TenKhachHang, customer.SoDienThoai, customer.Email
+      ])
+    }]
+  }));
+
   function showError(xhr) {
     if (xhr.status === 401) {
       location.assign('dang-nhap.html');
@@ -63,6 +75,8 @@
   }
 
   function renderCustomers(customers) {
+    visibleCustomers = customers;
+    enableCustomerExport(customers.length);
     $rows.empty();
     $('#customer-count').text(customers.length + ' khách hàng');
     if (!customers.length) emptyRow($rows, 4, 'Không tìm thấy khách hàng.');
@@ -86,6 +100,7 @@
 
   async function loadCustomers() {
     const version = ++listVersion;
+    enableCustomerExport(false);
     try {
       const rows = await $.getJSON(api, { q: $search.val() });
       if (version === listVersion) renderCustomers(rows);
@@ -179,6 +194,7 @@
 
   $search.on('input', () => {
     listVersion++;
+    enableCustomerExport(false);
     clearTimeout(searchTimer);
     searchTimer = setTimeout(loadCustomers, 250);
   });

@@ -30,6 +30,41 @@
   let invoiceTimer;
   let customerTimer;
 
+  const enableComboExport = ExcelExport.bind('combo-export', () => ({
+    filename: 'danh-muc-combo',
+    sheets: [{
+      name: 'Danh mục combo',
+      columns: [['Mã combo', 16], ['Tên combo', 32], ['Mô tả', 42], ['Giá', 18, ExcelExport.money],
+        ['Đã bán', 13, ExcelExport.integer]],
+      rows: Array.from($comboRows.children(), row => $(row).data('combo')).filter(Boolean).map(combo =>
+        [combo.MaCombo, combo.TenCombo, combo.MoTa, Number(combo.GiaCombo), Number(combo.DaBan)])
+    }]
+  }));
+
+  const enableInvoiceExport = ExcelExport.bind('invoice-export', async () => {
+    const invoices = Array.from($invoiceRows.children(), row => $(row).data('invoice')).filter(Boolean);
+    const details = [];
+    for (let index = 0; index < invoices.length; index += 5) {
+      const batch = invoices.slice(index, index + 5);
+      details.push(...await Promise.all(batch.map(invoice =>
+        $.getJSON(invoiceApi + '/' + encodeURIComponent(invoice.MaHoaDon))
+      )));
+    }
+    return {
+      filename: 'hoa-don',
+      sheets: [
+        { name: 'Hóa đơn', columns: [['Mã hóa đơn', 18], ['Mã khách', 16], ['Khách hàng', 30],
+          ['Ngày mua', 22, ExcelExport.dateTime], ['Số lượng', 14, ExcelExport.integer], ['Tổng tiền', 20, ExcelExport.money]],
+          rows: invoices.map(row => [row.MaHoaDon, row.MaKhachHang, row.TenKhachHang,
+            ExcelExport.asDate(row.NgayMua), row.SoLuong, row.TongTien]) },
+        { name: 'Chi tiết combo', columns: [['Mã hóa đơn', 18], ['Mã combo', 16], ['Combo', 32],
+          ['Số lượng', 14, ExcelExport.integer], ['Đơn giá', 18, ExcelExport.money], ['Thành tiền', 20, ExcelExport.money]],
+          rows: details.flatMap(invoice => invoice.ChiTiet.map(line =>
+            [invoice.MaHoaDon, line.MaCombo, line.TenCombo, line.SoLuong, line.DonGia, line.ThanhTien])) }
+      ]
+    };
+  });
+
   function showError($message, xhr) {
     if (xhr.status === 401) {
       location.assign('dang-nhap.html');
@@ -74,6 +109,7 @@
   }
 
   function renderCombos(rows) {
+    enableComboExport(rows.length);
     $comboRows.empty();
     $('#combo-count').text(rows.length + ' combo');
     if (!rows.length) emptyRow($comboRows, 4, 'Không tìm thấy combo.');
@@ -92,6 +128,7 @@
 
   async function loadComboRows() {
     const version = ++comboVersion;
+    enableComboExport(false);
     const keyword = $('#combo-search').val().trim();
     try {
       const rows = keyword ? await $.getJSON(comboApi, { q: keyword }) : combos;
@@ -169,6 +206,7 @@
 
   $('#combo-search').on('input', () => {
     comboVersion++;
+    enableComboExport(false);
     clearTimeout(comboTimer);
     comboTimer = setTimeout(loadComboRows, 250);
   });
@@ -305,12 +343,13 @@
   /* ---------- Danh sách và chi tiết hóa đơn ---------- */
 
   function renderInvoices(rows) {
+    enableInvoiceExport(rows.length);
     $invoiceRows.empty();
     $('#invoice-count').text(rows.length + ' hóa đơn');
     if (!rows.length) emptyRow($invoiceRows, 4, 'Không tìm thấy hóa đơn.');
     for (const row of rows) {
       const active = row.MaHoaDon === selectedInvoice;
-      $invoiceRows.append($('<tr>').data('code', row.MaHoaDon).toggleClass('is-selected', active).append(
+      $invoiceRows.append($('<tr>').data('code', row.MaHoaDon).data('invoice', row).toggleClass('is-selected', active).append(
         $('<td>').append($('<button>', {
           type: 'button', class: 'customer-selector', text: row.MaHoaDon, 'aria-pressed': String(active)
         })),
@@ -323,6 +362,7 @@
 
   async function loadInvoices() {
     const version = ++invoiceVersion;
+    enableInvoiceExport(false);
     const params = { q: $('#invoice-search').val(), tuNgay: $('#invoice-from').val(), denNgay: $('#invoice-to').val() };
     try {
       const rows = await $.getJSON(invoiceApi, params);
@@ -399,6 +439,7 @@
 
   $('#invoice-search, #invoice-from, #invoice-to').on('input change', () => {
     invoiceVersion++;
+    enableInvoiceExport(false);
     clearTimeout(invoiceTimer);
     invoiceTimer = setTimeout(loadInvoices, 250);
   });

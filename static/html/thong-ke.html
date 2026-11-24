@@ -42,6 +42,10 @@
             <input class="form-control" type="date" id="stats-to" required>
           </div>
           <button class="btn btn-dark" type="submit" disabled>Xem thống kê</button>
+          <div class="text-end">
+            <button type="button" class="btn btn-outline-dark btn-sm" id="stats-export" disabled>Xuất Excel</button>
+            <span class="small d-block" id="stats-export-message" role="status"></span>
+          </div>
         </form>
         <p class="form-message" id="stats-message" role="status"></p>
       </section>
@@ -107,6 +111,7 @@
       <p class="stats-note">Doanh thu vé tính theo ngày chiếu, không gồm vé đã hủy và suất bị hủy. Doanh thu bắp nước tính theo ngày lập hóa đơn.</p>
     </main>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="../js/xuat-excel.js"></script>
     <script src="../js/thong-ke.js"></script>
   </body>
 </html>

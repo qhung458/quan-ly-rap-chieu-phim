@@ -38,7 +38,7 @@ function syncMovies(rows) {
   setOptions(byId('genre-filter'), genres.map(genre => [genre, genre]));
 }
 
-function makeCatalog({ id, key, label, filters, matches, cells, onLoad }) {
+function makeCatalog({ id, key, label, filters, matches, cells, sheet, onLoad }) {
   const section = byId(id);
   const form = section.querySelector('form');
   const fieldset = form.querySelector('fieldset');
@@ -52,6 +52,10 @@ function makeCatalog({ id, key, label, filters, matches, cells, onLoad }) {
   const endpoint = '/api/' + id;
   let rows = [];
   let selected = '';
+  const enableExport = ExcelExport.bind(id + '-export', () => ({
+    filename: id,
+    sheets: [{ name: sheet.name, columns: sheet.columns, rows: rows.filter(matches).map(sheet.row) }]
+  }));
 
   function showMessage(text, error = false) {
     message.textContent = text;
@@ -68,6 +72,7 @@ function makeCatalog({ id, key, label, filters, matches, cells, onLoad }) {
 
   function render() {
     const visible = rows.filter(matches);
+    enableExport(visible.length);
     count.textContent = visible.length + ' ' + label;
     body.replaceChildren();
     if (!visible.length) emptyTable('Không tìm thấy ' + label + '.');
@@ -167,11 +172,29 @@ const movieCatalog = makeCatalog({
     && (!byId('genre-filter').value || movie.TheLoai === byId('genre-filter').value),
   cells: movie => [movie.TenPhim, movie.TheLoai, movie.DaoDien || '—', movie.ThoiLuong + ' phút',
     formatDate(movie.NgayKhoiChieu), movie.DoTuoiChoPhep === 0 ? 'P' : 'T' + movie.DoTuoiChoPhep],
+  sheet: {
+    name: 'Phim',
+    columns: [['Mã phim', 16], ['Tên phim', 36], ['Thể loại', 20], ['Đạo diễn', 26],
+      ['Thời lượng (phút)', 20, ExcelExport.integer], ['Ngày khởi chiếu', 19, ExcelExport.date],
+      ['Độ tuổi tối thiểu', 19, ExcelExport.integer]],
+    row: movie => [movie.MaPhim, movie.TenPhim, movie.TheLoai, movie.DaoDien, movie.ThoiLuong,
+      ExcelExport.asDate(movie.NgayKhoiChieu), movie.DoTuoiChoPhep]
+  },
   onLoad: rows => {
     syncMovies(rows);
     showtimeCatalog.render();
   }
 });
+
+function showtimeCatalogCells(show) {
+  return [
+    movies.find(movie => movie.MaPhim === show.MaPhim)?.TenPhim ?? show.MaPhim,
+    rooms.find(room => room.MaPhong === show.MaPhong)?.TenPhong ?? show.MaPhong,
+    formatDate(show.NgayChieu), show.GioBatDau,
+    show.GioKetThuc + (show.GioKetThuc < show.GioBatDau ? ' (+1 ngày)' : ''),
+    money.format(show.GiaVe), statusLabels[show.TrangThai] ?? show.TrangThai
+  ]
+}
 
 const showtimeCatalog = makeCatalog({
   id: 'suat-chieu',
@@ -180,13 +203,17 @@ const showtimeCatalog = makeCatalog({
   filters: ['movie-filter', 'date-filter'],
   matches: show => (!byId('movie-filter').value || show.MaPhim === byId('movie-filter').value)
     && (!byId('date-filter').value || show.NgayChieu === byId('date-filter').value),
-  cells: show => [
-    movies.find(movie => movie.MaPhim === show.MaPhim)?.TenPhim ?? show.MaPhim,
-    rooms.find(room => room.MaPhong === show.MaPhong)?.TenPhong ?? show.MaPhong,
-    formatDate(show.NgayChieu), show.GioBatDau,
-    show.GioKetThuc + (show.GioKetThuc < show.GioBatDau ? ' (+1 ngày)' : ''),
-    money.format(show.GiaVe), statusLabels[show.TrangThai] ?? show.TrangThai
-  ]
+  cells: showtimeCatalogCells,
+  sheet: {
+    name: 'Suất chiếu',
+    columns: [['Mã suất', 18], ['Phim', 36], ['Phòng', 24], ['Ngày chiếu', 17, ExcelExport.date],
+      ['Bắt đầu', 14], ['Kết thúc', 23], ['Giá vé', 18, ExcelExport.money], ['Trạng thái', 18]],
+    row: show => {
+      const display = showtimeCatalogCells(show);
+      return [show.MaSuatChieu, ...display.slice(0, 2), ExcelExport.asDate(show.NgayChieu),
+        ...display.slice(3, 5), Number(show.GiaVe), display[6]];
+    }
+  }
 });
 
 function suggestEnd() {
