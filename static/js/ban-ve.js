@@ -26,6 +26,7 @@
   let tickets = [];
   let customers = [];
   let selectedSeat = null;
+  let selectedSeats = [];
   let selectedTicket = null;
   let moving = false;
   let ticketQuery = '';
@@ -146,9 +147,12 @@
     const canChooseSeat = active && Boolean(show?.CoTheBan);
     const canChange = active && viewing && selectedTicket.TrangThai === 'DaDat' && show.CoTheHuyDoi;
     const viewedSeat = viewing && selectedTicket.TrangThai !== 'DaHuy' ? selectedTicket : null;
-    const selection = viewedSeat || selectedSeat;
+    const selectedCodes = new Set(viewing
+      ? (viewedSeat ? [viewedSeat.MaGhe] : [])
+      : moving ? (selectedSeat ? [selectedSeat.MaGhe] : []) : selectedSeats.map(seat => seat.MaGhe));
+    const selectedForSale = moving ? (selectedSeat ? [selectedSeat] : []) : selectedSeats;
     const price = viewing || (moving && selectedTicket.MaSuatChieu === show?.MaSuatChieu)
-      ? selectedTicket.GiaVe : show?.GiaVe;
+      ? selectedTicket.GiaVe : show?.GiaVe == null ? null : show.GiaVe * (moving ? 1 : Math.max(selectedSeats.length, 1));
     const pickedShow = show ?? shows.find(item => item.MaSuatChieu === $show.val());
 
     $('#ticket-room').val(pickedShow ? pickedShow.MaPhong + ' - ' + pickedShow.TenPhong : '');
@@ -157,7 +161,7 @@
       const $button = $(this);
       const seat = $button.data('seat');
       const isOccupied = Boolean(seat.DaCoVe);
-      const isSelected = seat.MaGhe === selection?.MaGhe;
+      const isSelected = selectedCodes.has(seat.MaGhe);
       const name = 'Ghế ' + seatLabel(seat) + ($button.hasClass('is-vip') ? ', VIP' : '');
       $button.toggleClass('is-occupied', isOccupied)
         .toggleClass('is-selected', isSelected)
@@ -171,13 +175,20 @@
     $customer.add($customerSearch).prop('disabled', !active || Boolean(selectedTicket) || !show.CoTheBan);
     if (selectedTicket) $customer.val(selectedTicket.MaKhachHang);
     const customerCode = $customer.val();
-    $('#ticket-id').val(selectedTicket?.MaVe ?? '');
-    $('#ticket-seat').val(seatLabel(viewing ? selectedTicket : selectedSeat));
+    const ticketSeats = viewing ? [selectedTicket] : selectedForSale;
+    $('#ticket-seat').val(ticketSeats.map(seatLabel).join(', '));
     $('#ticket-date').val(selectedTicket?.NgayDat ?? '');
     $('#ticket-price').val(price == null ? '' : priceFormat.format(price));
     $('#ticket-status').val(selectedTicket ? statusLabels[selectedTicket.TrangThai] : '');
+    $('#ticket-id').val(selectedTicket?.MaVe ?? (selectedSeats.length > 1
+      ? selectedSeats.length + ' mã vé sẽ được tạo khi lưu' : ''));
+    $('#ticket-id').toggleClass('ticket-multiple', !selectedTicket && selectedSeats.length > 1);
+    if (!selectedTicket && selectedSeats.length > 1) {
+      $('#ticket-price').val(priceFormat.format(price) + ' · ' + selectedSeats.length + ' vé');
+    }
+    const hasSeatSelection = moving ? Boolean(selectedSeat) : selectedSeats.length > 0;
     $('#save-ticket').text(moving ? 'Lưu đổi' : 'Lưu vé')
-      .prop('disabled', !active || !show.CoTheBan || viewing || !selectedSeat || !(customerCode || moving));
+      .prop('disabled', !active || !show.CoTheBan || viewing || !hasSeatSelection || !(customerCode || moving));
     $('#move-ticket, #cancel-ticket').prop('disabled', !canChange);
     $('#clear-ticket').text(moving ? 'Bỏ đổi' : 'Làm mới')
       .prop('disabled', !ready || saving || (!moving && !$show.val()));
@@ -232,6 +243,7 @@
   function clearSelection() {
     selectedTicket = null;
     selectedSeat = null;
+    selectedSeats = [];
     moving = false;
     resetCustomerPicker();
   }
@@ -293,6 +305,10 @@
         const code = selectedSeat.MaGhe;
         selectedSeat = seats.find(seat => seat.MaGhe === code && !seat.DaCoVe) ?? null;
       }
+      if (selectedSeats.length) {
+        const available = new Map(seats.filter(seat => !seat.DaCoVe).map(seat => [seat.MaGhe, seat]));
+        selectedSeats = selectedSeats.map(seat => available.get(seat.MaGhe)).filter(Boolean);
+      }
 
       renderSeatMap();
       renderTickets();
@@ -322,6 +338,7 @@
       });
       moving = false;
       selectedSeat = null;
+      selectedSeats = [];
       resetCustomerPicker();
       clearSearch();
       saved = true;
@@ -329,6 +346,42 @@
       await loadShow(selectedTicket.MaSuatChieu, true);
     } catch (xhr) {
       if (xhr?.status === 409 || xhr?.status === 404) await loadShow($show.val(), true);
+      showError(xhr);
+    } finally {
+      saving = false;
+      renderSelection();
+      if (saved) $('#clear-ticket').trigger('focus');
+    }
+  }
+
+  async function sellTickets() {
+    if (saving || loading || !show?.CoTheBan || !$customer.val() || !selectedSeats.length) return;
+    const showCode = show.MaSuatChieu;
+    const payload = {
+      MaSuatChieu: showCode,
+      MaKhachHang: $customer.val(),
+      MaGhes: selectedSeats.map(seat => seat.MaGhe)
+    };
+    saving = true;
+    showMessage('');
+    renderSelection();
+    let saved = false;
+    try {
+      const result = await $.ajax({
+        url: api, method: 'POST', contentType: 'application/json', data: JSON.stringify(payload)
+      });
+      const savedTickets = Array.isArray(result) ? result : [result];
+      selectedTicket = null;
+      selectedSeat = null;
+      selectedSeats = [];
+      moving = false;
+      clearSearch();
+      saved = true;
+      showMessage('Đã lưu ' + savedTickets.length + ' vé: '
+        + savedTickets.map(ticket => ticket.MaVe).join(', ') + '.');
+      await loadShow(showCode, true);
+    } catch (xhr) {
+      if (xhr?.status === 409 || xhr?.status === 404) await loadShow(showCode, true);
       showError(xhr);
     } finally {
       saving = false;
@@ -374,7 +427,14 @@
     const seat = $(this).data('seat');
     if (seat.DaCoVe) return;
     if (selectedTicket && !moving) clearSelection();
-    selectedSeat = selectedSeat?.MaGhe === seat.MaGhe ? null : seat;
+    if (moving) {
+      selectedSeat = selectedSeat?.MaGhe === seat.MaGhe ? null : seat;
+    } else {
+      const isSelected = selectedSeats.some(item => item.MaGhe === seat.MaGhe);
+      selectedSeats = isSelected
+        ? selectedSeats.filter(item => item.MaGhe !== seat.MaGhe)
+        : [...selectedSeats, seat];
+    }
     renderSelection();
     feedbackForShow();
   });
@@ -383,6 +443,7 @@
     if (saving || loading || moving) return;
     selectedTicket = $(this).data('ticket');
     selectedSeat = null;
+    selectedSeats = [];
     resetCustomerPicker();
     renderSelection();
     feedbackForShow();
@@ -404,6 +465,7 @@
     if (saving || loading || !show?.CoTheHuyDoi || selectedTicket?.TrangThai !== 'DaDat') return;
     moving = true;
     selectedSeat = null;
+    selectedSeats = [];
     renderSelection();
     feedbackForShow();
     $show.trigger('focus');
@@ -411,12 +473,13 @@
 
   $form.on('submit', event => {
     event.preventDefault();
-    if (saving || loading || !show?.CoTheBan || !selectedSeat || (selectedTicket && !moving)) return;
-    const payload = { MaSuatChieu: show.MaSuatChieu, MaGhe: selectedSeat.MaGhe };
+    if (saving || loading || !show?.CoTheBan || (selectedTicket && !moving)) return;
     if (moving) {
+      if (!selectedSeat) return;
+      const payload = { MaSuatChieu: show.MaSuatChieu, MaGhe: selectedSeat.MaGhe };
       changeTicket('PUT', '/doi', { ...payload, Ve: ticketReference(selectedTicket) }, 'Đã đổi vé');
-    } else if ($customer.val()) {
-      changeTicket('POST', '', { ...payload, MaKhachHang: $customer.val() }, 'Đã lưu vé');
+    } else if ($customer.val() && selectedSeats.length) {
+      sellTickets();
     }
   });
 

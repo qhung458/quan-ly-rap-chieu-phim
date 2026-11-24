@@ -5,6 +5,7 @@ const transaction = require('./transaction.cjs');
 
 const router = express.Router();
 router.use(requireLogin);
+const maxSeatsPerSale = 130;
 
 const showQuery = `
   SELECT sc.MaSuatChieu, p.MaPhim, p.TenPhim, sc.MaPhong, pc.TenPhong, sc.GiaVe, sc.TrangThai,
@@ -134,23 +135,37 @@ router.get('/khach-hang', async (_req, res) => {
 
 router.post('/', async (req, res) => {
   const showCode = readCode(req.body?.MaSuatChieu, 20);
-  const seatCode = readCode(req.body?.MaGhe, 15);
+  const multipleSeats = Array.isArray(req.body?.MaGhes);
+  const seatCodes = multipleSeats
+    ? req.body.MaGhes.map(code => readCode(code, 15))
+    : [readCode(req.body?.MaGhe, 15)];
+  if (!seatCodes.length || seatCodes.length > maxSeatsPerSale) {
+    throw new TicketError(400, `Chọn từ 1 đến ${maxSeatsPerSale} ghế cho một lần bán.`);
+  }
+  if (new Set(seatCodes).size !== seatCodes.length) {
+    throw new TicketError(400, 'Không thể chọn trùng một ghế trong cùng lần bán.');
+  }
   const customerCode = readCode(req.body?.MaKhachHang, 10);
-  const ticket = await transaction(async connection => {
-    const destination = await readDestination(connection, showCode, seatCode);
+  const tickets = await transaction(async connection => {
     const [[customer]] = await connection.execute(
       'SELECT MaKhachHang FROM KhachHang WHERE MaKhachHang = ? FOR SHARE', [customerCode]
     );
     if (!customer) throw new TicketError(409, 'Khách hàng không còn tồn tại.');
-    const code = await nextTicketCode(connection);
-    const key = [code, destination.MaSuatChieu, customer.MaKhachHang, destination.MaGhe];
-    await connection.execute(`
-      INSERT INTO Ve (MaVe, MaSuatChieu, MaKhachHang, MaGhe, NgayDat, GiaVe)
-      VALUES (?, ?, ?, ?, NOW(), ?)
-    `, [...key, destination.GiaVe]);
-    return readTicket(connection, key);
+
+    const created = [];
+    for (const seatCode of seatCodes) {
+      const destination = await readDestination(connection, showCode, seatCode);
+      const code = await nextTicketCode(connection);
+      const key = [code, destination.MaSuatChieu, customer.MaKhachHang, destination.MaGhe];
+      await connection.execute(`
+        INSERT INTO Ve (MaVe, MaSuatChieu, MaKhachHang, MaGhe, NgayDat, GiaVe)
+        VALUES (?, ?, ?, ?, NOW(), ?)
+      `, [...key, destination.GiaVe]);
+      created.push(await readTicket(connection, key));
+    }
+    return created;
   }, 'rap_ve');
-  res.status(201).json(ticket);
+  res.status(201).json(multipleSeats ? tickets : tickets[0]);
 });
 
 router.put('/doi', async (req, res) => {
