@@ -1,582 +1,251 @@
-// -------------------- DỮ LIỆU --------------------
+'use strict';
 
-// Dữ liệu phim và suất chiếu được lấy từ MySQL.
+const byId = id => document.getElementById(id);
+const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 2 });
+const statusLabels = { SapChieu: 'Sắp chiếu', DangChieu: 'Đang chiếu', KetThuc: 'Kết thúc', Huy: 'Hủy' };
+const formatDate = date => date.split('-').reverse().join('/');
+const normalize = text => text.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replaceAll('đ', 'd');
 let movies = [];
-let showtimes = [];
+let rooms = [];
 
-let selectedMovieId = null;
-let selectedShowtimeId = null;
+async function request(url, method = 'GET', data) {
+  const response = await fetch(url, {
+    method,
+    ...(data && { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+  });
+  if (response.status === 401) {
+    location.replace('dang-nhap.html');
+    throw new Error('Vui lòng đăng nhập.');
+  }
+  if (response.status === 204) return;
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.message || 'Không thể xử lý yêu cầu.');
+  return result;
+}
 
-// Tải danh sách phim từ MySQL.
-async function loadMoviesFromAPI() {
-    try {
-        const response = await fetch("/api/phim");
+function setOptions(select, entries) {
+  const previous = select.value;
+  select.replaceChildren(select.options[0], ...entries.map(([value, label]) => new Option(label, value)));
+  select.value = entries.some(([value]) => value === previous) ? previous : '';
+}
 
-        if (!response.ok) {
-            throw new Error("Không thể tải danh sách phim.");
-        }
+function syncMovies(rows) {
+  movies = rows;
+  const entries = rows.map(movie => [movie.MaPhim, movie.TenPhim + ' (' + movie.MaPhim + ')']);
+  setOptions(byId('ShowMovie'), entries);
+  setOptions(byId('movie-filter'), entries);
+  const genres = [...new Set(rows.map(movie => movie.TheLoai))].sort((a, b) => a.localeCompare(b, 'vi'));
+  setOptions(byId('genre-filter'), genres.map(genre => [genre, genre]));
+}
 
-        const data = await response.json();
+function makeCatalog({ id, key, label, filters, matches, cells, onLoad }) {
+  const section = byId(id);
+  const form = section.querySelector('form');
+  const fieldset = form.querySelector('fieldset');
+  const table = section.querySelector('table');
+  const body = table.tBodies[0];
+  const count = section.querySelector('[data-count]');
+  const save = form.querySelector('[data-save]');
+  const remove = form.querySelector('[data-delete]');
+  const code = form.elements.namedItem(key);
+  const message = form.querySelector('.form-message');
+  const endpoint = '/api/' + id;
+  let rows = [];
+  let selected = '';
 
-        movies = data.map(item => ({
-            id: item.MaPhim,
-            name: item.TenPhim,
-            genre: item.TheLoai,
-            director: item.DaoDien || "",
-            duration: item.ThoiLuong,
-            date: item.NgayKhoiChieu,
-            age: String(item.DoTuoiChoPhep)
-        }));
+  function showMessage(text, error = false) {
+    message.textContent = text;
+    message.classList.toggle('text-danger', error);
+    message.classList.toggle('text-success', !error);
+  }
 
-        renderMovies();
-    } catch (error) {
-        console.error(error);
-        alert("Không thể tải danh sách phim từ máy chủ.");
+  function emptyTable(text) {
+    const row = body.insertRow();
+    const cell = row.insertCell();
+    cell.colSpan = table.tHead.rows[0].cells.length;
+    cell.textContent = text;
+  }
+
+  function render() {
+    const visible = rows.filter(matches);
+    count.textContent = visible.length + ' ' + label;
+    body.replaceChildren();
+    if (!visible.length) emptyTable('Không tìm thấy ' + label + '.');
+    for (const item of visible) {
+      const row = body.insertRow();
+      row.classList.toggle('is-selected', item[key] === selected);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'customer-selector';
+      button.textContent = item[key];
+      button.addEventListener('click', () => {
+        if (fieldset.disabled) return;
+        select(item);
+        button.focus();
+      });
+      row.insertCell().append(button);
+      for (const value of cells(item)) row.insertCell().textContent = value;
     }
-}
+  }
 
-function formatDate(value) {
-    if (!value) return "";
-    const [year, month, day] = value.split("-");
-    return `${day}/${month}/${year}`;
-}
+  function select(item) {
+    form.reset();
+    selected = item?.[key] ?? '';
+    if (item) {
+      for (const input of form.querySelectorAll('[name]')) input.value = item[input.name] ?? '';
+    }
+    code.readOnly = Boolean(selected);
+    remove.disabled = !selected;
+    save.textContent = selected ? 'Lưu thay đổi' : 'Thêm';
+    for (const row of body.rows) {
+      const button = row.querySelector('button');
+      row.classList.toggle('is-selected', Boolean(button && button.textContent === selected));
+    }
+    showMessage('');
+  }
 
-function escapeHTML(value) {
-    return String(value ?? "").replace(/[&<>"']/g, char => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
-    })[char]);
-}
+  async function load() {
+    try {
+      rows = await request(endpoint);
+    } catch (error) {
+      if (!rows.length) {
+        body.replaceChildren();
+        emptyTable('Không thể tải danh sách ' + label + '.');
+      }
+      throw error;
+    }
+    onLoad?.(rows);
+    render();
+  }
 
-// -------------------- ĐIỀU HƯỚNG --------------------
-function showSection() {
-    const showtimes = location.hash === "#showtimesPage";
-    const current = showtimes ? "#showtimesPage" : "#moviesPage";
+  async function mutate(method, values) {
+    fieldset.disabled = true;
+    showMessage('');
+    try {
+      const path = selected ? endpoint + '/' + encodeURIComponent(selected) : endpoint;
+      const result = await request(path, method, values);
+      const savedCode = values?.[key];
+      select();
+      try {
+        await load();
+        if (savedCode) select(rows.find(item => item[key] === savedCode));
+        showMessage(result.message);
+      } catch {
+        showMessage(result.message + ' Tải lại trang để cập nhật danh sách.', true);
+      }
+    } catch (error) {
+      showMessage(error.message, true);
+    } finally {
+      fieldset.disabled = false;
+    }
+  }
 
-    document.getElementById("moviesPage").classList.toggle("hidden", showtimes);
-    document.getElementById("showtimesPage").classList.toggle("hidden", !showtimes);
-    document.querySelectorAll('.nav-item[href^="#"]').forEach(link => {
-        const active = link.getAttribute("href") === current;
-        link.classList.toggle("active", active);
-        if (active) link.setAttribute("aria-current", "location");
-        else link.removeAttribute("aria-current");
-    });
-}
-
-window.addEventListener("hashchange", showSection);
-showSection();
-
-// -------------------- QUẢN LÝ PHIM --------------------
-const movieForm = document.getElementById("movieForm");
-const movieFields = {
-    id: document.getElementById("movieId"),
-    name: document.getElementById("movieName"),
-    genre: document.getElementById("movieGenre"),
-    director: document.getElementById("movieDirector"),
-    duration: document.getElementById("movieDuration"),
-    date: document.getElementById("movieDate"),
-    age: document.getElementById("movieAge")
-};
-function renderMovies(list = movies) {
-    const tbody = document.getElementById("movieTable");
-
-    tbody.innerHTML = list.map(movie => `
-        <tr data-id="${escapeHTML(movie.id)}" class="${selectedMovieId === movie.id ? "selected" : ""}">
-            <td>${escapeHTML(movie.id)}</td>
-            <td>${escapeHTML(movie.name)}</td>
-            <td>${escapeHTML(movie.genre)}</td>
-            <td>${escapeHTML(movie.director)}</td>
-            <td>${escapeHTML(movie.duration)} phút</td>
-            <td>${formatDate(movie.date)}</td>
-            <td>${Number(movie.age) === 0 ? "P" : "T" + escapeHTML(movie.age)}</td>
-        </tr>
-    `).join("");
-
-    tbody.querySelectorAll("tr").forEach(row => {
-        row.addEventListener("click", () => selectMovie(row.dataset.id));
-    });
-
-    updateMovieSelects();
-}
-
-function selectMovie(id) {
-    const movie = movies.find(item => item.id === id);
-    if (!movie) return;
-    selectedMovieId = id;
-    Object.keys(movieFields).forEach(key => movieFields[key].value = movie[key]);
-    renderMovies(getFilteredMovies());
-}
-
-function getFilteredMovies() {
-    const name = document.getElementById("searchMovieName").value.trim().toLowerCase();
-    const genre = document.getElementById("searchMovieGenre").value;
-
-    return movies.filter(movie =>
-        movie.name.toLowerCase().includes(name) &&
-        (!genre || movie.genre.includes(genre))
-    );
-}
-
-function resetMovieForm() {
-    movieForm.reset();
-    movieFields.id.disabled = false;
-    selectedMovieId = null;
-    renderMovies(getFilteredMovies());
-}
-
-document.getElementById("addMovie").addEventListener("click", () => {
-    resetMovieForm();
-    movieFields.id.focus();
-});
-
-movieForm.addEventListener("submit", async event => {
+  form.addEventListener('submit', event => {
     event.preventDefault();
+    const data = Object.fromEntries(new FormData(form));
+    for (const name of Object.keys(data)) data[name] = data[name].trim();
+    mutate(selected ? 'PUT' : 'POST', data);
+  });
+  remove.addEventListener('click', () => {
+    if (selected && confirm('Xóa ' + label + ' ' + selected + '?')) mutate('DELETE');
+  });
+  form.querySelector('[data-reset]').addEventListener('click', () => {
+    select();
+    code.focus();
+  });
+  for (const filter of filters) byId(filter).addEventListener('input', render);
 
-    const movie = {
-        MaPhim: movieFields.id.value.trim(),
-        TenPhim: movieFields.name.value.trim(),
-        TheLoai: movieFields.genre.value.trim(),
-        DaoDien: movieFields.director.value.trim(),
-        ThoiLuong: Number(movieFields.duration.value),
-        NgayKhoiChieu: movieFields.date.value,
-        DoTuoiChoPhep: Number(movieFields.age.value)
-    };
-
-    const isEditing = Boolean(selectedMovieId);
-
-    const url = isEditing
-        ? `/api/phim/${encodeURIComponent(selectedMovieId)}`
-        : "/api/phim";
-
-    const method = isEditing ? "PUT" : "POST";
-
-    try {
-        const response = await fetch(url, {
-            method: method,
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(movie)
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            alert(result.message || "Không thể lưu thông tin phim.");
-            return;
-        }
-
-        alert(isEditing ? "Cập nhật phim thành công!" : "Thêm phim thành công!");
-
-        selectedMovieId = movie.MaPhim;
-
-        await loadMoviesFromAPI();
-
-        selectMovie(movie.MaPhim);
-
-    } catch (error) {
-        console.error(error);
-        alert("Không thể kết nối đến máy chủ.");
-    }
-});
-
-document.getElementById("editMovie").addEventListener("click", () => {
-    if (!selectedMovieId) return alert("Vui lòng chọn một phim trong bảng trước khi sửa.");
-    movieFields.id.disabled = true;
-    movieFields.name.focus();
-});
-
-document.getElementById("deleteMovie").addEventListener("click", async () => {
-    if (!selectedMovieId) {
-        return alert("Vui lòng chọn phim cần xóa.");
-    }
-    if (!confirm("Bạn có chắc muốn xóa phim này?")) {
-        return;
-    }
-    try {
-        const response = await fetch(
-            `/api/phim/${encodeURIComponent(selectedMovieId)}`,
-            {
-                method: "DELETE"
-            }
-        );
-        const result = await response.json();
-        if (!response.ok) {
-            alert(result.message || "Không thể xóa phim.");
-            return;
-        }
-        alert("Xóa phim thành công!");
-        selectedMovieId = null;
-        await loadMoviesFromAPI();
-        resetMovieForm();
-    } catch (error) {
-        console.error(error);
-        alert("Không thể kết nối đến máy chủ.");
-    }
-});
-
-document.getElementById("resetMovie").addEventListener("click", resetMovieForm);
-document.getElementById("searchMovie").addEventListener("click", () => renderMovies(getFilteredMovies()));
-document.getElementById("clearMovieSearch").addEventListener("click", () => {
-    document.getElementById("searchMovieName").value = "";
-    document.getElementById("searchMovieGenre").value = "";
-    document.getElementById("searchMovieStatus").value = "";
-    renderMovies();
-});
-
-
-// -------------------- QUẢN LÝ SUẤT CHIẾU --------------------
-const showtimeForm = document.getElementById("showtimeForm");
-
-const showtimeFields = {
-    id: document.getElementById("showtimeId"),
-    movieId: document.getElementById("showtimeMovie"),
-    room: document.getElementById("showtimeRoom"),
-    date: document.getElementById("showtimeDate"),
-    start: document.getElementById("showtimeStart"),
-    end: document.getElementById("showtimeEnd"),
-    price: document.getElementById("showtimePrice"),
-    status: document.getElementById("showtimeStatus")
-};
-
-// Chuyển trạng thái giữa giao diện và cơ sở dữ liệu.
-const showtimeStatusMap = {
-    SapChieu: "Sắp chiếu",
-    DangChieu: "Đang chiếu",
-    KetThuc: "Kết thúc",
-    Huy: "Hủy"
-};
-
-function getStatusCode(status) {
-    const value = String(status ?? "").trim();
-
-    if (showtimeStatusMap[value]) return value;
-
-    const entry = Object.entries(showtimeStatusMap)
-        .find(([, label]) => label === value);
-
-    return entry ? entry[0] : value;
+  return { load, render, enable: () => { fieldset.disabled = false; } };
 }
 
-function getStatusLabel(status) {
-    const code = getStatusCode(status);
-    return showtimeStatusMap[code] || status;
-}
-
-function getStatusFormValue(status) {
-    const code = getStatusCode(status);
-    const label = getStatusLabel(code);
-    const options = Array.from(showtimeFields.status.options);
-
-    const matchingOption = options.find(option =>
-        option.value === code || option.value === label
-    );
-
-    return matchingOption ? matchingOption.value : code;
-}
-// -------------------- TẢI DỮ LIỆU TỪ MYSQL --------------------
-async function loadShowtimesFromAPI() {
-    try {
-        const response = await fetch("/api/suat-chieu");
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.message || "Không thể tải danh sách suất chiếu.");
-        }
-
-        showtimes = result.map(item => ({
-            id: item.MaSuatChieu,
-            movieId: item.MaPhim,
-            room: item.MaPhong,
-            date: item.NgayChieu,
-            start: String(item.GioBatDau).slice(0, 5),
-            end: String(item.GioKetThuc).slice(0, 5),
-            price: Number(item.GiaVe),
-            status: getStatusCode(item.TrangThai)
-        }));
-
-        renderShowtimes(getFilteredShowtimes());
-
-    } catch (error) {
-        console.error(error);
-        alert(error.message || "Không thể kết nối đến máy chủ để tải suất chiếu.");
-    }
-}
-// -------------------- CẬP NHẬT DANH SÁCH PHIM --------------------
-function updateMovieSelects() {
-    const selects = [
-        document.getElementById("filterMovie"),
-        showtimeFields.movieId
-    ];
-
-    const previousValues = selects.map(select => select.value);
-
-    selects.forEach((select, index) => {
-        const firstOption = index === 0
-            ? '<option value="">--Tất cả phim--</option>'
-            : '<option value="">--Chọn phim--</option>';
-
-        select.innerHTML = firstOption + movies.map(movie =>
-            `<option value="${escapeHTML(movie.id)}">${escapeHTML(movie.name)} (${escapeHTML(movie.id)})</option>`
-        ).join("");
-
-        if (movies.some(movie => movie.id === previousValues[index])) {
-            select.value = previousValues[index];
-        }
-    });
-}
-// -------------------- TÍNH GIỜ KẾT THÚC --------------------
-function calculateEndTime() {
-    const movie = movies.find(item =>
-        item.id === showtimeFields.movieId.value
-    );
-
-    const start = showtimeFields.start.value;
-
-    if (!movie || !start) {
-        showtimeFields.end.value = "";
-        return;
-    }
-
-    const [hours, minutes] = start.split(":").map(Number);
-    const total = hours * 60 + minutes + Number(movie.duration);
-
-    const endHours = Math.floor(total / 60) % 24;
-    const endMinutes = total % 60;
-
-    showtimeFields.end.value =
-        `${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}`;
-}
-
-showtimeFields.movieId.addEventListener("change", calculateEndTime);
-showtimeFields.start.addEventListener("change", calculateEndTime);
-
-// -------------------- HIỂN THỊ SUẤT CHIẾU --------------------
-
-function renderShowtimes(list = showtimes) {
-    const tbody = document.getElementById("showtimeTable");
-
-    tbody.innerHTML = list.map(item => `
-        <tr data-id="${escapeHTML(item.id)}"
-            class="${selectedShowtimeId === item.id ? "selected" : ""}">
-            <td>${escapeHTML(item.id)}</td>
-            <td>${escapeHTML(item.movieId)}</td>
-            <td>${escapeHTML(item.room)}</td>
-            <td>${formatDate(item.date)}</td>
-            <td>${escapeHTML(item.start)}</td>
-            <td>${escapeHTML(item.end)}</td>
-            <td>${Number(item.price).toLocaleString("vi-VN")}</td>
-            <td>${escapeHTML(getStatusLabel(item.status))}</td>
-        </tr>
-    `).join("");
-
-    tbody.querySelectorAll("tr").forEach(row => {
-        row.addEventListener("click", () => {
-            selectShowtime(row.dataset.id);
-        });
-    });
-}
-// -------------------- CHỌN SUẤT CHIẾU --------------------
-function selectShowtime(id) {
-    const item = showtimes.find(showtime => showtime.id === id);
-
-    if (!item) return;
-
-    selectedShowtimeId = id;
-
-    showtimeFields.id.value = item.id;
-    showtimeFields.movieId.value = item.movieId;
-    showtimeFields.room.value = item.room;
-    showtimeFields.date.value = item.date;
-    showtimeFields.start.value = item.start;
-    showtimeFields.end.value = item.end;
-    showtimeFields.price.value = item.price;
-    showtimeFields.status.value = getStatusFormValue(item.status);
-
-    renderShowtimes(getFilteredShowtimes());
-}
-// -------------------- LỌC SUẤT CHIẾU --------------------
-function getFilteredShowtimes() {
-    const movieId = document.getElementById("filterMovie").value;
-    const date = document.getElementById("filterDate").value;
-
-    return showtimes.filter(item =>
-        (!movieId || item.movieId === movieId) &&
-        (!date || item.date === date)
-    );
-}
-// -------------------- LÀM MỚI FORM --------------------
-function resetShowtimeForm() {
-    showtimeForm.reset();
-
-    showtimeFields.id.disabled = false;
-    showtimeFields.end.value = "";
-
-    selectedShowtimeId = null;
-
-    renderShowtimes(getFilteredShowtimes());
-}
-// -------------------- THÊM SUẤT CHIẾU --------------------
-document.getElementById("addShowtime").addEventListener("click", () => {
-    resetShowtimeForm();
-    showtimeFields.id.focus();
-});
-// -------------------- THÊM / CẬP NHẬT SUẤT CHIẾU --------------------
-showtimeForm.addEventListener("submit", async event => {
-    event.preventDefault();
-
-    calculateEndTime();
-
-    const movie = movies.find(item =>
-        item.id === showtimeFields.movieId.value
-    );
-
-    if (!movie) {
-        return alert("Vui lòng chọn phim hợp lệ.");
-    }
-
-    const price = Number(showtimeFields.price.value);
-
-    if (!Number.isFinite(price) || price <= 0) {
-        return alert("Giá vé phải lớn hơn 0!");
-    }
-
-    const item = {
-        MaSuatChieu: showtimeFields.id.value.trim(),
-        MaPhim: showtimeFields.movieId.value,
-        MaPhong: showtimeFields.room.value,
-        NgayChieu: showtimeFields.date.value,
-        GioBatDau: showtimeFields.start.value,
-        GioKetThuc: showtimeFields.end.value,
-        GiaVe: price,
-        TrangThai: getStatusCode(showtimeFields.status.value)
-    };
-
-    if (item.GioKetThuc <= item.GioBatDau) {
-        return alert("Giờ kết thúc phải sau giờ bắt đầu trong cùng ngày.");
-    }
-
-    const isEditing = Boolean(selectedShowtimeId);
-
-    const url = isEditing
-        ? `/api/suat-chieu/${encodeURIComponent(selectedShowtimeId)}`
-        : "/api/suat-chieu";
-
-    const method = isEditing ? "PUT" : "POST";
-
-    try {
-        const response = await fetch(url, {
-            method,
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(item)
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            alert(result.message || "Không thể lưu thông tin suất chiếu.");
-            return;
-        }
-
-        alert(isEditing
-            ? "Cập nhật suất chiếu thành công!"
-            : "Thêm suất chiếu thành công!");
-
-        selectedShowtimeId = item.MaSuatChieu;
-
-        await loadShowtimesFromAPI();
-
-        selectShowtime(item.MaSuatChieu);
-
-    } catch (error) {
-        console.error(error);
-        alert("Không thể kết nối đến máy chủ.");
-    }
-});
-// -------------------- SỬA SUẤT CHIẾU --------------------
-document.getElementById("editShowtime").addEventListener("click", () => {
-    if (!selectedShowtimeId) {
-        return alert("Vui lòng chọn suất chiếu trong bảng trước khi sửa.");
-    }
-
-    showtimeFields.id.disabled = true;
-    showtimeFields.movieId.focus();
-});
-// -------------------- XÓA SUẤT CHIẾU --------------------
-document.getElementById("deleteShowtime").addEventListener("click", async () => {
-    if (!selectedShowtimeId) {
-        return alert("Vui lòng chọn suất chiếu cần xóa.");
-    }
-
-    if (!confirm("Bạn có chắc muốn xóa suất chiếu này?")) {
-        return;
-    }
-
-    try {
-        const response = await fetch(
-            `/api/suat-chieu/${encodeURIComponent(selectedShowtimeId)}`,
-            {
-                method: "DELETE"
-            }
-        );
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            alert(result.message || "Không thể xóa suất chiếu.");
-            return;
-        }
-
-        alert("Xóa suất chiếu thành công!");
-
-        selectedShowtimeId = null;
-
-        await loadShowtimesFromAPI();
-
-        resetShowtimeForm();
-
-    } catch (error) {
-        console.error(error);
-        alert("Không thể kết nối đến máy chủ.");
-    }
-});
-// -------------------- CÁC NÚT ĐIỀU KHIỂN --------------------
-document.getElementById("resetShowtime").addEventListener("click", resetShowtimeForm);
-
-document.getElementById("filterShowtimes").addEventListener("click", () => {
-    renderShowtimes(getFilteredShowtimes());
+const movieCatalog = makeCatalog({
+  id: 'phim',
+  key: 'MaPhim',
+  label: 'phim',
+  filters: ['movie-search', 'genre-filter'],
+  matches: movie => normalize(movie.MaPhim + ' ' + movie.TenPhim).includes(normalize(byId('movie-search').value.trim()))
+    && (!byId('genre-filter').value || movie.TheLoai === byId('genre-filter').value),
+  cells: movie => [movie.TenPhim, movie.TheLoai, movie.DaoDien || '—', movie.ThoiLuong + ' phút',
+    formatDate(movie.NgayKhoiChieu), movie.DoTuoiChoPhep === 0 ? 'P' : 'T' + movie.DoTuoiChoPhep],
+  onLoad: rows => {
+    syncMovies(rows);
+    showtimeCatalog.render();
+  }
 });
 
-document.getElementById("clearShowtimeFilter").addEventListener("click", () => {
-    document.getElementById("filterMovie").value = "";
-    document.getElementById("filterDate").value = "";
-
-    renderShowtimes();
-});
-document.getElementById("backLink").addEventListener("click", event => {
-    if (document.referrer.startsWith(location.origin + "/")) {
-        event.preventDefault();
-        history.back();
-    }
-});
-
-document.getElementById("logoutLink").addEventListener("click", async event => {
-    event.preventDefault();
-    try {
-        const response = await fetch("/api/auth/logout", { method: "POST" });
-        if (!response.ok) throw new Error("Logout failed");
-        location.assign("dang-nhap.html");
-    } catch {
-        alert("Không thể đăng xuất. Vui lòng thử lại.");
-    }
+const showtimeCatalog = makeCatalog({
+  id: 'suat-chieu',
+  key: 'MaSuatChieu',
+  label: 'suất chiếu',
+  filters: ['movie-filter', 'date-filter'],
+  matches: show => (!byId('movie-filter').value || show.MaPhim === byId('movie-filter').value)
+    && (!byId('date-filter').value || show.NgayChieu === byId('date-filter').value),
+  cells: show => [
+    movies.find(movie => movie.MaPhim === show.MaPhim)?.TenPhim ?? show.MaPhim,
+    rooms.find(room => room.MaPhong === show.MaPhong)?.TenPhong ?? show.MaPhong,
+    formatDate(show.NgayChieu), show.GioBatDau,
+    show.GioKetThuc + (show.GioKetThuc < show.GioBatDau ? ' (+1 ngày)' : ''),
+    money.format(show.GiaVe), statusLabels[show.TrangThai] ?? show.TrangThai
+  ]
 });
 
-
-// -------------------- KHỞI TẠO GIAO DIỆN --------------------
-async function initializeData() {
-    await loadMoviesFromAPI();
-    await loadShowtimesFromAPI();
+function suggestEnd() {
+  const movie = movies.find(item => item.MaPhim === byId('ShowMovie').value);
+  const start = byId('GioBatDau').value;
+  if (!movie || !start) return;
+  const [hour, minute, second = 0] = start.split(':').map(Number);
+  const end = (hour * 60 + minute + movie.ThoiLuong) % 1440;
+  byId('GioKetThuc').value = [Math.floor(end / 60), end % 60, second]
+    .map(part => String(part).padStart(2, '0')).join(':');
 }
 
-initializeData();
+function showPage() {
+  const active = ['#suat-chieu', '#showtimesPage'].includes(location.hash) ? 'suat-chieu' : 'phim';
+  for (const id of ['phim', 'suat-chieu']) {
+    byId(id).hidden = id !== active;
+    const link = document.querySelector('a[href="#' + id + '"]');
+    if (id === active) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  }
+}
+
+byId('ShowMovie').addEventListener('change', suggestEnd);
+byId('GioBatDau').addEventListener('change', suggestEnd);
+window.addEventListener('hashchange', showPage);
+showPage();
+
+byId('logout-button').addEventListener('click', async () => {
+  try {
+    await request('/api/auth/logout', 'POST');
+    location.replace('dang-nhap.html');
+  } catch (error) {
+    byId('page-error').textContent = error.message;
+  }
+});
+
+async function initialize() {
+  try {
+    const account = await request('/api/auth/me');
+    byId('account-name').textContent = account.HoTen || account.TenDangNhap;
+    byId('logout-button').hidden = false;
+    const results = await Promise.allSettled([
+      movieCatalog.load().then(movieCatalog.enable),
+      showtimeCatalog.load(),
+      request('/api/phong-chieu').then(result => {
+        rooms = result;
+        setOptions(byId('MaPhong'), rooms.map(room => [room.MaPhong, room.TenPhong + ' (' + room.MaPhong + ')']));
+      })
+    ]);
+    if (results.every(result => result.status === 'fulfilled')) {
+      showtimeCatalog.render();
+      showtimeCatalog.enable();
+    } else {
+      const error = results.find(result => result.status === 'rejected');
+      byId('page-error').textContent = error.reason.message;
+    }
+  } catch (error) {
+    byId('page-error').textContent = error.message;
+  }
+}
+
+initialize();

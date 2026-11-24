@@ -1,178 +1,136 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quản lý rạp chiếu phim</title>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Phim và suất chiếu | Quản lý rạp chiếu phim</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <link rel="stylesheet" href="../css/rap-chieu-phim.css">
     <link rel="stylesheet" href="../css/phim-va-suatchieu.css">
-</head>
-<body>
-    <div class="app">
-        <header class="topbar">
-            <div class="top-links">
-                <a href="dang-nhap.html">Tài khoản</a>
-                <a href="dang-nhap.html" id="backLink">Trở về</a>
-                <a href="dang-nhap.html" id="logoutLink">Thoát</a>
+    <script defer src="../js/phim-va-suat-chieu.js"></script>
+  </head>
+  <body class="app-layout">
+    <header class="app-header d-flex align-items-center justify-content-between gap-3">
+      <a class="brand" href="dang-nhap.html"><span aria-hidden="true">▶</span> Quản lý rạp chiếu phim</a>
+      <div class="d-flex align-items-center gap-3">
+        <span id="account-name" class="small"></span>
+        <button id="logout-button" class="btn btn-outline-dark btn-sm" type="button" hidden>Đăng xuất</button>
+      </div>
+    </header>
+    <nav class="sidebar" aria-label="Điều hướng chính">
+      <ul class="menu-list">
+        <li><a href="dang-nhap.html">Đăng nhập</a></li>
+        <li><a href="#phim" aria-current="page">Phim</a></li>
+        <li><a href="phong-chieu-va-ghe.html">Phòng chiếu và ghế</a></li>
+        <li><a href="#suat-chieu">Suất chiếu</a></li>
+        <li><a href="ban-ve.html">Bán vé</a></li>
+        <li><a href="khach-hang.html">Khách hàng</a></li>
+        <li><span aria-disabled="true">Bắp nước và hóa đơn</span></li>
+        <li><span aria-disabled="true">Thống kê</span></li>
+      </ul>
+    </nav>
+    <main class="main-content">
+      <p id="page-error" class="form-message text-danger mb-3" role="alert"></p>
+      <section id="phim" aria-labelledby="phim-title">
+        <h1 id="phim-title">Phim</h1>
+        <p class="page-description">Tra cứu và cập nhật thông tin phim.</p>
+        <div class="catalog-layout">
+          <section class="panel" aria-labelledby="phim-list">
+            <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+              <h2 id="phim-list" class="mb-0">Danh sách phim</h2>
+              <span class="small text-secondary" data-count role="status"></span>
             </div>
-            <span>Wireframe – Hệ thống quản lý rạp chiếu phim</span>
-        </header>
-
-        <div class="main-layout">
-            <aside class="sidebar">
-                <a class="nav-item" href="dang-nhap.html"><span class="nav-icon"></span>Đăng nhập</a>
-                <a class="nav-item" href="#moviesPage"><span class="nav-icon"></span>Phim</a>
-                <a class="nav-item" href="phong-chieu-va-ghe.html"><span class="nav-icon"></span>Phòng chiếu và ghế</a>
-                <a class="nav-item" href="#showtimesPage"><span class="nav-icon"></span>Suất chiếu</a>
-                <a class="nav-item" href="ban-ve.html"><span class="nav-icon"></span>Bán vé</a>
-                <a class="nav-item" href="khach-hang.html"><span class="nav-icon"></span>Khách hàng</a>
-                <a class="nav-item" href="bap-nuoc-va-hoa-don.html"><span class="nav-icon"></span>Bắp nước và hóa đơn</a>
-                <a class="nav-item" href="thong-ke.html"><span class="nav-icon"></span>Thống kê</a>
-            </aside>
-
-            <main class="content">
-                <!-- MÀN HÌNH PHIM -->
-                <section id="moviesPage" class="page">
-                    <div class="page-heading">
-                        <h1>Danh sách phim</h1>
-                        <p>Bảng Phim: mã phim, tên, thể loại, đạo diễn, thời lượng, ngày khởi chiếu, độ tuổi cho phép</p>
-                    </div>
-
-                    <div class="movie-layout">
-                        <div class="table-wrap">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Mã phim</th><th>Tên phim</th><th>Thể loại</th>
-                                        <th>Đạo diễn</th><th>Thời lượng</th><th>Khởi chiếu</th>
-                                        <th>Độ tuổi</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="movieTable"></tbody>
-                            </table>
-                        </div>
-
-                        <div class="right-column">
-                            <fieldset>
-                                <legend>Thông tin phim</legend>
-                                <form id="movieForm">
-                                    <div class="form-row"><label for="movieId">Mã phim</label><input id="movieId" required></div>
-                                    <div class="form-row"><label for="movieName">Tên phim</label><input id="movieName" required></div>
-                                    <div class="form-row">
-                                        <label for="movieGenre">Thể loại</label>
-                                        <input id="movieGenre" required maxlength="100">
-                                    </div>
-                                    <div class="form-row"><label for="movieDirector">Đạo diễn</label><input id="movieDirector" required></div>
-                                    <div class="form-row"><label for="movieDuration">Thời lượng (phút)</label><input id="movieDuration" type="number" min="1" required></div>
-                                    <div class="form-row"><label for="movieDate">Ngày khởi chiếu</label><input id="movieDate" type="date" required></div>
-                                    <div class="form-row">
-                                        <label for="movieAge">Độ tuổi cho phép</label>
-                                        <select id="movieAge" required>
-                                            <option value="">--Chọn--</option>
-                                            <option value="0">P</option>
-                                            <option value="13">T13</option>
-                                            <option value="16">T16</option>
-                                            <option value="18">T18</option>
-                                        </select>
-                                    </div>
-                                    
-                                    <div class="form-actions">
-                                        <button type="button" id="addMovie">Thêm</button>
-                                        <button type="submit">Lưu</button>
-                                        <button type="button" id="editMovie">Sửa</button>
-                                        <button type="button" id="deleteMovie">Xóa</button>
-                                        <button type="button" id="resetMovie">Làm mới</button>
-                                    </div>
-                                </form>
-                            </fieldset>
-
-                            <fieldset>
-                                <legend>Tìm kiếm</legend>
-                                <div class="form-row"><label for="searchMovieName">Tên phim</label><input id="searchMovieName"></div>
-                                <div class="form-row"><label for="searchMovieGenre">Thể loại</label>
-                                    <select id="searchMovieGenre">
-                                        <option value="">--Tất cả--</option><option>Hành động</option><option>Hoạt hình</option>
-                                        <option>Kinh dị</option><option>Tình cảm</option><option>Tâm lý</option><option>Gia đình</option><option>Hài</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="form-actions">
-                                    <button type="button" id="searchMovie">Tìm kiếm</button>
-                                    <button type="button" id="clearMovieSearch">Hủy tìm kiếm</button>
-                                </div>
-                            </fieldset>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- MÀN HÌNH SUẤT CHIẾU -->
-                <section id="showtimesPage" class="page hidden">
-                    <div class="page-heading">
-                        <h1>Suất chiếu</h1>
-                        <p>Bảng Suất chiếu; lọc theo phim và ngày chiếu</p>
-                    </div>
-
-                    <fieldset class="filter-box">
-                        <legend>Lọc suất chiếu</legend>
-                        <div class="filter-controls">
-                            <label for="filterMovie">Phim</label>
-                            <select id="filterMovie"><option value="">--Tất cả phim--</option></select>
-                            <label for="filterDate">Ngày chiếu</label>
-                            <input type="date" id="filterDate">
-                            <button type="button" id="filterShowtimes">Xem suất chiếu</button>
-                            <button type="button" id="clearShowtimeFilter">Hủy lọc</button>
-                        </div>
-                    </fieldset>
-
-                    <div class="showtime-layout">
-                        <div class="table-wrap">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Mã suất</th><th>Mã phim</th><th>Mã phòng</th>
-                                        <th>Ngày chiếu</th><th>Giờ bắt đầu</th><th>Giờ kết thúc</th>
-                                        <th>Giá vé</th><th>Trạng thái</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="showtimeTable"></tbody>
-                            </table>
-                        </div>
-
-                        <fieldset class="showtime-form-box">
-                            <legend>Thông tin suất chiếu</legend>
-                            <form id="showtimeForm">
-                                <div class="form-row"><label for="showtimeId">Mã suất chiếu</label><input id="showtimeId" required></div>
-                                <div class="form-row"><label for="showtimeMovie">Phim</label><select id="showtimeMovie" required></select></div>
-                                <div class="form-row"><label for="showtimeRoom">Phòng chiếu</label>
-                                    <select id="showtimeRoom" required><option value="">--Chọn phòng--</option><option>PC01</option><option>PC02</option><option>PC03</option><option>PC04</option></select>
-                                </div>
-                                <div class="form-row"><label for="showtimeDate">Ngày chiếu</label><input type="date" id="showtimeDate" required></div>
-                                <div class="form-row"><label for="showtimeStart">Giờ bắt đầu</label><input type="time" id="showtimeStart" required></div>
-                                <div class="form-row"><label for="showtimeEnd">Giờ kết thúc</label><input type="time" id="showtimeEnd" readonly></div>
-                                <div class="form-row"><label for="showtimePrice">Giá vé (VNĐ)</label><input type="number" id="showtimePrice" min="0" required></div>
-                                <div class="form-row"><label for="showtimeStatus">Trạng thái</label>
-                                    <select id="showtimeStatus"><option>Sắp chiếu</option><option>Đang chiếu</option><option>Kết thúc</option><option>Hủy</option></select>
-                                </div>
-                                <div class="form-actions">
-                                    <button type="button" id="addShowtime">Thêm</button>
-                                    <button type="submit">Lưu</button>
-                                    <button type="button" id="editShowtime">Sửa</button>
-                                    <button type="button" id="deleteShowtime">Xóa</button>
-                                    <button type="button" id="resetShowtime">Làm mới</button>
-                                </div>
-                            </form>
-                        </fieldset>
-                    </div>
-                </section>
-
-                <section id="placeholderPage" class="page hidden">
-                    <div class="page-heading">
-                        <h1 id="placeholderTitle">Chức năng</h1>
-                        <p>...</p>
-                    </div>
-                </section>
-            </main>
+            <div class="catalog-filters mb-3">
+              <div><label class="form-label" for="movie-search">Mã hoặc tên phim</label><input class="form-control" id="movie-search" type="search"></div>
+              <div><label class="form-label" for="genre-filter">Thể loại</label><select class="form-select" id="genre-filter"><option value="">Tất cả thể loại</option></select></div>
+            </div>
+            <div class="table-responsive">
+              <table class="table align-middle customer-table mb-0" aria-labelledby="phim-list">
+                <thead><tr><th scope="col">Mã phim</th><th scope="col">Tên phim</th><th scope="col">Thể loại</th><th scope="col">Đạo diễn</th><th scope="col">Thời lượng</th><th scope="col">Khởi chiếu</th><th scope="col">Độ tuổi</th></tr></thead>
+                <tbody><tr><td colspan="7">Đang tải dữ liệu…</td></tr></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="panel" aria-labelledby="phim-detail">
+            <h2 id="phim-detail">Thông tin phim</h2>
+            <form class="form-stack">
+              <fieldset disabled>
+                <label class="form-label" for="MaPhim">Mã phim</label>
+                <input class="form-control" id="MaPhim" name="MaPhim" required maxlength="15">
+                <label class="form-label" for="TenPhim">Tên phim</label>
+                <input class="form-control" id="TenPhim" name="TenPhim" required maxlength="150">
+                <label class="form-label" for="TheLoai">Thể loại</label>
+                <input class="form-control" id="TheLoai" name="TheLoai" required maxlength="100">
+                <label class="form-label" for="DaoDien">Đạo diễn</label>
+                <input class="form-control" id="DaoDien" name="DaoDien" maxlength="100">
+                <label class="form-label" for="ThoiLuong">Thời lượng (phút)</label>
+                <input class="form-control" id="ThoiLuong" name="ThoiLuong" type="number" min="1" max="2147483647" required>
+                <label class="form-label" for="NgayKhoiChieu">Ngày khởi chiếu</label>
+                <input class="form-control" id="NgayKhoiChieu" name="NgayKhoiChieu" type="date" required>
+                <label class="form-label" for="DoTuoiChoPhep">Độ tuổi tối thiểu</label>
+                <input class="form-control" id="DoTuoiChoPhep" name="DoTuoiChoPhep" type="number" min="0" max="2147483647" value="0" required>
+                <div class="d-flex flex-wrap gap-2">
+                  <button class="btn btn-dark" type="submit" data-save>Thêm</button>
+                  <button class="btn btn-outline-dark" type="button" data-delete disabled>Xóa</button>
+                  <button class="btn btn-outline-secondary" type="button" data-reset>Làm mới</button>
+                </div>
+              </fieldset>
+              <p class="form-message" role="status"></p>
+            </form>
+          </section>
         </div>
-    </div>
-    <script src="../js/phim-va-suat-chieu.js"></script>
-</body>
+      </section>
+      <section id="suat-chieu" hidden aria-labelledby="suat-chieu-title">
+        <h1 id="suat-chieu-title">Suất chiếu</h1>
+        <p class="page-description">Tra cứu và xếp lịch chiếu theo phim và phòng.</p>
+        <div class="catalog-layout">
+          <section class="panel" aria-labelledby="suat-chieu-list">
+            <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+              <h2 id="suat-chieu-list" class="mb-0">Danh sách suất chiếu</h2>
+              <span class="small text-secondary" data-count role="status"></span>
+            </div>
+            <div class="catalog-filters mb-3">
+              <div><label class="form-label" for="movie-filter">Phim</label><select class="form-select" id="movie-filter"><option value="">Tất cả phim</option></select></div>
+              <div><label class="form-label" for="date-filter">Ngày chiếu</label><input class="form-control" id="date-filter" type="date"></div>
+            </div>
+            <div class="table-responsive">
+              <table class="table align-middle customer-table mb-0" aria-labelledby="suat-chieu-list">
+                <thead><tr><th scope="col">Mã suất</th><th scope="col">Phim</th><th scope="col">Phòng</th><th scope="col">Ngày chiếu</th><th scope="col">Bắt đầu</th><th scope="col">Kết thúc</th><th scope="col">Giá vé</th><th scope="col">Trạng thái</th></tr></thead>
+                <tbody><tr><td colspan="8">Đang tải dữ liệu…</td></tr></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="panel" aria-labelledby="suat-chieu-detail">
+            <h2 id="suat-chieu-detail">Thông tin suất chiếu</h2>
+            <form class="form-stack">
+              <fieldset disabled>
+                <label class="form-label" for="MaSuatChieu">Mã suất chiếu</label>
+                <input class="form-control" id="MaSuatChieu" name="MaSuatChieu" required maxlength="20">
+                <label class="form-label" for="ShowMovie">Phim</label>
+                <select class="form-select" id="ShowMovie" name="MaPhim" required><option value="">Chọn phim</option></select>
+                <label class="form-label" for="MaPhong">Phòng chiếu</label>
+                <select class="form-select" id="MaPhong" name="MaPhong" required><option value="">Chọn phòng</option></select>
+                <label class="form-label" for="NgayChieu">Ngày chiếu</label>
+                <input class="form-control" id="NgayChieu" name="NgayChieu" type="date" required>
+                <label class="form-label" for="GioBatDau">Giờ bắt đầu</label>
+                <input class="form-control" id="GioBatDau" name="GioBatDau" type="time" step="1" required>
+                <label class="form-label" for="GioKetThuc">Giờ kết thúc</label>
+                <input class="form-control" id="GioKetThuc" name="GioKetThuc" type="time" step="1" required>
+                <label class="form-label" for="GiaVe">Giá vé (₫)</label>
+                <input class="form-control" id="GiaVe" name="GiaVe" type="number" min="0" step="0.01" required>
+                <label class="form-label" for="TrangThai">Trạng thái</label>
+                <select class="form-select" id="TrangThai" name="TrangThai" required><option value="SapChieu">Sắp chiếu</option><option value="DangChieu">Đang chiếu</option><option value="KetThuc">Kết thúc</option><option value="Huy">Hủy</option></select>
+                <div class="d-flex flex-wrap gap-2">
+                  <button class="btn btn-dark" type="submit" data-save>Thêm</button>
+                  <button class="btn btn-outline-dark" type="button" data-delete disabled>Xóa</button>
+                  <button class="btn btn-outline-secondary" type="button" data-reset>Làm mới</button>
+                </div>
+              </fieldset>
+              <p class="form-message" role="status"></p>
+            </form>
+          </section>
+        </div>
+      </section>
+    </main>
+  </body>
 </html>

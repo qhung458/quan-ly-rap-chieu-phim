@@ -61,7 +61,7 @@ app.use('/api', (_req, res) => res.status(404).json({ message: 'Không tìm th�
 app.get('/', (_req, res) => res.redirect('/html/dang-nhap.html'));
 app.get([
   '/html/khach-hang.html', '/html/phong-chieu-va-ghe.html', '/html/ban-ve.html',
-  '/html/bap-nuoc-va-hoa-don.html', '/html/thong-ke.html'
+    '/html/bap-nuoc-va-hoa-don.html', '/html/thong-ke.html', '/html/phim-va-suatchieu.html'
 ], (req, res, next) => {
   res.set('Cache-Control', 'no-store');
   if (!req.session.user) return res.redirect('/html/dang-nhap.html');
