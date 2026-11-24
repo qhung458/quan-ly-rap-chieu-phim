@@ -1,6 +1,7 @@
+
 const express = require('express');
 const db = require('./db.cjs');
-const { requireLogin, requireAdmin } = require('./auth.cjs');
+const { requireLogin } = require('./auth.cjs');
 
 const router = express.Router();
 router.use(requireLogin);
@@ -11,7 +12,7 @@ class MovieError extends Error {
         this.status = status;
     }
 }
-function validateMovie(body) {
+function validateMovie(body = {}) {
     const movie = {
         MaPhim: String(body.MaPhim ?? '').trim(),
         TenPhim: String(body.TenPhim ?? '').trim(),
@@ -19,7 +20,7 @@ function validateMovie(body) {
         DaoDien: String(body.DaoDien ?? '').trim() || null,
         ThoiLuong: Number(body.ThoiLuong),
         NgayKhoiChieu: String(body.NgayKhoiChieu ?? ''),
-        DoTuoiChoPhep: Number(body.DoTuoiChoPhep)
+        DoTuoiChoPhep: Number(body.DoTuoiChoPhep ?? 0)
     };
 
     if (!movie.MaPhim || movie.MaPhim.length > 15) {
@@ -38,12 +39,12 @@ function validateMovie(body) {
         throw new MovieError(400, 'Tên đạo diễn tối đa 100 ký tự.');
     }
 
-    if (!Number.isInteger(movie.ThoiLuong) || movie.ThoiLuong <= 0) {
+    if (!Number.isInteger(movie.ThoiLuong) || movie.ThoiLuong <= 0 || movie.ThoiLuong > 2147483647) {
         throw new MovieError(400, 'Thời lượng phim phải là số nguyên lớn hơn 0.');
     }
 
     const datePattern = /^\d{4}-\d{2}-\d{2}$/;
-    const date = new Date(movie.NgayKhoiChieu + 'T00:00:00');
+    const date = new Date(movie.NgayKhoiChieu + 'T00:00:00Z');
 
     if (
         !datePattern.test(movie.NgayKhoiChieu) ||
@@ -53,7 +54,7 @@ function validateMovie(body) {
         throw new MovieError(400, 'Ngày khởi chiếu không hợp lệ.');
     }
 
-    if (!Number.isInteger(movie.DoTuoiChoPhep) || movie.DoTuoiChoPhep < 0) {
+    if (!Number.isInteger(movie.DoTuoiChoPhep) || movie.DoTuoiChoPhep < 0 || movie.DoTuoiChoPhep > 2147483647) {
         throw new MovieError(400, 'Độ tuổi cho phép phải là số nguyên không âm.');
     }
 
@@ -153,8 +154,7 @@ router.put('/:maPhim', async (req, res, next) => {
     }
 });
 // -------------------- XÓA PHIM --------------------
-// Chỉ quản trị viên được xóa phim.
-router.delete('/:maPhim', requireAdmin, async (req, res, next) => {
+router.delete('/:maPhim', async (req, res, next) => {
     try {
         const maPhim = req.params.maPhim;
 

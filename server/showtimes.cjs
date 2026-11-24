@@ -1,6 +1,7 @@
+
 const express = require('express');
 const db = require('./db.cjs');
-const { requireLogin, requireAdmin } = require('./auth.cjs');
+const { requireLogin } = require('./auth.cjs');
 
 const router = express.Router();
 router.use(requireLogin);
@@ -11,7 +12,7 @@ class ShowtimeError extends Error {
         this.status = status;
     }
 }
-function validateShowtime(body, maSuatChieu = null) {
+function validateShowtime(body = {}, maSuatChieu = null) {
     const item = {
         MaSuatChieu: String(maSuatChieu ?? body.MaSuatChieu ?? '').trim(),
         MaPhim: String(body.MaPhim ?? '').trim(),
@@ -19,7 +20,7 @@ function validateShowtime(body, maSuatChieu = null) {
         NgayChieu: String(body.NgayChieu ?? ''),
         GioBatDau: String(body.GioBatDau ?? ''),
         GioKetThuc: String(body.GioKetThuc ?? ''),
-        GiaVe: Number(body.GiaVe),
+        GiaVe: body.GiaVe == null || body.GiaVe === '' ? NaN : Number(body.GiaVe),
         TrangThai: String(body.TrangThai ?? 'SapChieu')
     };
 
@@ -35,13 +36,10 @@ function validateShowtime(body, maSuatChieu = null) {
         throw new ShowtimeError(400, 'Mã phòng không hợp lệ.');
     }
 
-   // Kiểm tra ngày chiếu theo định dạng YYYY-MM-DD.
-const datePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
-const dateMatch = item.NgayChieu.match(datePattern);
-
-if (!dateMatch) {
-    throw new ShowtimeError(400, 'Ngày chiếu không hợp lệ.');
-}
+    const dateMatch = item.NgayChieu.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!dateMatch) {
+        throw new ShowtimeError(400, 'Ngày chiếu không hợp lệ.');
+    }
 
     const year = Number(dateMatch[1]);
     const month = Number(dateMatch[2]);
@@ -67,12 +65,12 @@ if (!dateMatch) {
     if (item.GioBatDau.length === 5) item.GioBatDau += ':00';
     if (item.GioKetThuc.length === 5) item.GioKetThuc += ':00';
 
-    if (item.GioBatDau >= item.GioKetThuc) {
-        throw new ShowtimeError(400, 'Giờ kết thúc phải sau giờ bắt đầu trong cùng ngày.');
+    if (item.GioBatDau === item.GioKetThuc) {
+        throw new ShowtimeError(400, 'Giờ kết thúc phải khác giờ bắt đầu.');
     }
 
-    if (!Number.isFinite(item.GiaVe) || item.GiaVe <= 0) {
-        throw new ShowtimeError(400, 'Giá vé phải lớn hơn 0.');
+    if (!Number.isFinite(item.GiaVe) || item.GiaVe < 0 || item.GiaVe >= 1e16) {
+        throw new ShowtimeError(400, 'Giá vé phải từ 0 và nằm trong giới hạn cho phép.');
     }
 
     const allowedStatuses = ['SapChieu', 'DangChieu', 'KetThuc', 'Huy'];
@@ -112,16 +110,21 @@ async function checkRoomConflict(item, excludeId = null) {
         SELECT MaSuatChieu
         FROM SuatChieu
         WHERE MaPhong = ?
-          AND NgayChieu = ?
+          AND NgayChieu BETWEEN DATE_SUB(?, INTERVAL 1 DAY) AND DATE_ADD(?, INTERVAL 1 DAY)
           AND TrangThai <> 'Huy'
-          AND GioBatDau < ?
-          AND GioKetThuc > ?
+          AND TIMESTAMP(NgayChieu, GioBatDau) < TIMESTAMP(DATE_ADD(?, INTERVAL ? DAY), ?)
+          AND TIMESTAMP(DATE_ADD(NgayChieu, INTERVAL (GioKetThuc < GioBatDau) DAY), GioKetThuc)
+              > TIMESTAMP(?, ?)
     `;
 
     const params = [
         item.MaPhong,
         item.NgayChieu,
+        item.NgayChieu,
+        item.NgayChieu,
+        Number(item.GioKetThuc < item.GioBatDau),
         item.GioKetThuc,
+        item.NgayChieu,
         item.GioBatDau
     ];
 
@@ -148,8 +151,8 @@ router.get('/', async (_req, res, next) => {
                 MaPhim,
                 MaPhong,
                 DATE_FORMAT(NgayChieu, '%Y-%m-%d') AS NgayChieu,
-                TIME_FORMAT(GioBatDau, '%H:%i') AS GioBatDau,
-                TIME_FORMAT(GioKetThuc, '%H:%i') AS GioKetThuc,
+                TIME_FORMAT(GioBatDau, '%H:%i:%s') AS GioBatDau,
+                TIME_FORMAT(GioKetThuc, '%H:%i:%s') AS GioKetThuc,
                 GiaVe,
                 TrangThai
             FROM SuatChieu
@@ -240,8 +243,7 @@ router.put('/:maSuatChieu', async (req, res, next) => {
     }
 });
 // -------------------- XÓA SUẤT CHIẾU --------------------
-// Chỉ quản trị viên được xóa suất chiếu.
-router.delete('/:maSuatChieu', requireAdmin, async (req, res, next) => {
+router.delete('/:maSuatChieu', async (req, res, next) => {
     try {
         const maSuatChieu = req.params.maSuatChieu;
 
@@ -279,6 +281,13 @@ router.use((error, _req, res, _next) => {
         return res.status(409).json({
             message: 'Suất chiếu đã có vé hoặc dữ liệu liên quan nên không thể xóa.'
         });
+    }
+
+    if (error.code === 'ER_SIGNAL_EXCEPTION') {
+        return res.status(409).json({ message: 'Lịch chiếu xung đột hoặc thay đổi vi phạm quy tắc của suất đã có vé.' });
+    }
+    if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+        return res.status(409).json({ message: 'Phim hoặc phòng chiếu không còn tồn tại.' });
     }
 
     console.error(error.code || error.name);
