@@ -19,6 +19,17 @@ DROP TRIGGER IF EXISTS trg_SuatChieu_BeforeUpdate //
 DROP PROCEDURE IF EXISTS usp_KiemTraDatVe //
 DROP PROCEDURE IF EXISTS usp_KiemTraLichPhong //
 
+
+
+
+
+
+
+
+
+
+
+
 CREATE PROCEDURE usp_KiemTraDatVe(
     IN p_MaSuatChieu VARCHAR(20),
     IN p_MaGhe VARCHAR(15)
