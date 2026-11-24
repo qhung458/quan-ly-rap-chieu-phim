@@ -226,6 +226,7 @@ byId('logout-button').addEventListener('click', async () => {
 async function initialize() {
   try {
     const account = await request('/api/auth/me');
+    window.authToast.showPending();
     byId('account-name').textContent = account.HoTen || account.TenDangNhap;
     byId('logout-button').hidden = false;
     const results = await Promise.allSettled([
