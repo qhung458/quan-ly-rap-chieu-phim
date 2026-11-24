@@ -55,7 +55,8 @@
   color: #d5d9e0;
 }
 
-.stats-grid {
+.stats-grid,
+.stats-breakdown {
   display: grid;
   gap: 1.5rem;
   align-items: start;
@@ -94,8 +95,8 @@
   color: #646c79;
 }
 
-@media (min-width: 1200px) {
-  .stats-grid {
-    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+@media (min-width: 992px) {
+  .stats-breakdown {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

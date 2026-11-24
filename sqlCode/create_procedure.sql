@@ -27,6 +27,6 @@ BEGIN
       AND sc.NgayChieu = p_Ngay
     ORDER BY sc.GioBatDau ASC;
 END $$
-DELIMITER ;
+DELIMITER ;fn_SoGheTrong
 
 
