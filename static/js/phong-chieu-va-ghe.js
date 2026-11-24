@@ -67,7 +67,7 @@
     $('#delete-room').prop('disabled', !canDelete || !room || Boolean(roomMode));
     $('#clear-room, #logout-button').prop('disabled', !canManage);
 
-    $('#seat-row, #seat-number').prop('disabled', !seatEditing);
+    $('#seat-row, #seat-number, #seat-type').prop('disabled', !seatEditing);
     $('#add-seat').text(seatMode === 'add' ? 'Lưu ghế' : 'Thêm')
       .prop('disabled', !canManageSeats || seatMode === 'edit');
     $('#edit-seat').text(seatMode === 'edit' ? 'Lưu sửa' : 'Sửa')
@@ -102,11 +102,11 @@
   function renderSeats() {
     $seatRows.empty();
     $('#seat-count').text(room ? seats.length + ' ghế' : '');
-    if (!room) return emptyRow($seatRows, 4, 'Chọn một phòng để xem danh sách ghế.');
-    if (!seats.length) emptyRow($seatRows, 4, 'Phòng này chưa có ghế.');
+    if (!room) return emptyRow($seatRows, 5, 'Chọn một phòng để xem danh sách ghế.');
+    if (!seats.length) emptyRow($seatRows, 5, 'Phòng này chưa có ghế.');
     for (const item of seats) {
       $seatRows.append(recordRow(item.MaGhe, 'seat', item.MaGhe === seat?.MaGhe,
-        [item.MaPhong, item.SoHang, item.SoGhe]));
+        [item.MaPhong, item.SoHang, item.SoGhe, item.LoaiGhe === 'VIP' ? 'VIP' : 'Thường']));
     }
   }
 
@@ -131,6 +131,7 @@
     $('#seat-id').val(seat?.MaGhe ?? '').removeAttr('placeholder');
     $('#seat-row').val(seat?.SoHang ?? '');
     $('#seat-number').val(seat?.SoGhe ?? '');
+    $('#seat-type').val(seat?.LoaiGhe ?? 'Thuong');
     syncControls();
   }
 
@@ -159,7 +160,7 @@
     if (!room) return renderSeats();
 
     $('#seat-count').empty();
-    emptyRow($seatRows, 4, 'Đang tải ghế…');
+    emptyRow($seatRows, 5, 'Đang tải ghế…');
     try {
       const rows = await $.getJSON(roomUrl() + '/ghe');
       if (request !== seatRequest) return;
@@ -171,7 +172,7 @@
       renderSeats();
     } catch (xhr) {
       if (request !== seatRequest) return;
-      emptyRow($seatRows, 4, 'Không tải được ghế. Chọn lại phòng để thử lại.');
+      emptyRow($seatRows, 5, 'Không tải được ghế. Chọn lại phòng để thử lại.');
       showError($seatMessage, xhr);
     } finally {
       if (request === seatRequest) {
@@ -311,7 +312,8 @@
     const adding = seatMode === 'add';
     const payload = {
       SoHang: $('#seat-row').val(),
-      SoGhe: Number($('#seat-number').val())
+      SoGhe: Number($('#seat-number').val()),
+      LoaiGhe: $('#seat-type').val()
     };
     change(adding ? 'POST' : 'PUT', adding ? roomUrl() + '/ghe' : seatUrl(), payload, $seatMessage, async saved => {
       showMessage($seatMessage, adding ? 'Đã thêm ghế.' : 'Đã cập nhật ghế.');

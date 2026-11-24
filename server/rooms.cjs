@@ -34,10 +34,12 @@ function readRoom(body) {
 function readSeat(body) {
   const row = trimmed(body?.SoHang).toUpperCase();
   const number = body?.SoGhe;
-  if (!row || row.length > 5 || !Number.isInteger(number) || number < 1 || number > 2147483647) {
-    throw new RoomError(400, 'Nhập hàng ghế tối đa 5 ký tự và số ghế là số nguyên dương hợp lệ.');
+  const type = body?.LoaiGhe ?? 'Thuong';
+  if (!row || row.length > 5 || !Number.isInteger(number) || number < 1 || number > 2147483647
+      || !['Thuong', 'VIP'].includes(type)) {
+    throw new RoomError(400, 'Nhập hàng ghế, số ghế nguyên dương và chọn loại ghế Thường hoặc VIP.');
   }
-  return { SoHang: row, SoGhe: number };
+  return { SoHang: row, SoGhe: number, LoaiGhe: type };
 }
 
 function formatSeatCode(number) {
@@ -152,7 +154,7 @@ router.delete('/:roomCode', requireAdmin, async (req, res) => {
 
 router.get('/:roomCode/ghe', async (req, res) => {
   const [rows] = await db.execute(`
-    SELECT g.MaGhe, p.MaPhong, g.SoHang, g.SoGhe
+    SELECT g.MaGhe, p.MaPhong, g.SoHang, g.SoGhe, g.LoaiGhe
     FROM PhongChieu p
     LEFT JOIN Ghe g ON g.MaPhong = p.MaPhong
     WHERE p.MaPhong = ?
@@ -170,8 +172,8 @@ router.post('/:roomCode/ghe', async (req, res) => {
     if (count >= maxSeats) throw new RoomError(409, `Mỗi phòng có tối đa ${maxSeats} ghế.`);
 
     const codeForSeat = formatSeatCode(await firstSeatCodeNumber(connection, 1));
-    await connection.execute('INSERT INTO Ghe (MaGhe, MaPhong, SoHang, SoGhe) VALUES (?, ?, ?, ?)',
-      [codeForSeat, code, seat.SoHang, seat.SoGhe]);
+    await connection.execute('INSERT INTO Ghe (MaGhe, MaPhong, SoHang, SoGhe, LoaiGhe) VALUES (?, ?, ?, ?, ?)',
+      [codeForSeat, code, seat.SoHang, seat.SoGhe, seat.LoaiGhe]);
     await saveSeatCount(connection, code, count + 1);
     return { MaGhe: codeForSeat, MaPhong: code, ...seat };
   }, seatCodeLock);
@@ -183,12 +185,13 @@ router.put('/:roomCode/ghe/:seatCode', async (req, res) => {
   const saved = await transaction(async connection => {
     const code = await lockRoom(connection, req.params.roomCode);
     const old = await lockSeat(connection, code, req.params.seatCode);
-    if (old.SoHang !== seat.SoHang || old.SoGhe !== seat.SoGhe) {
+    const positionChanged = old.SoHang !== seat.SoHang || old.SoGhe !== seat.SoGhe;
+    if (positionChanged) {
       const [[ticket]] = await connection.execute('SELECT 1 FROM Ve WHERE MaGhe = ? LIMIT 1', [old.MaGhe]);
       if (ticket) throw new RoomError(409, 'Ghế đã có lịch sử vé nên không thể đổi vị trí.');
-      await connection.execute('UPDATE Ghe SET SoHang = ?, SoGhe = ? WHERE MaGhe = ? AND MaPhong = ?',
-        [seat.SoHang, seat.SoGhe, old.MaGhe, code]);
     }
+    await connection.execute('UPDATE Ghe SET SoHang = ?, SoGhe = ?, LoaiGhe = ? WHERE MaGhe = ? AND MaPhong = ?',
+      [seat.SoHang, seat.SoGhe, seat.LoaiGhe, old.MaGhe, code]);
     return { MaGhe: old.MaGhe, MaPhong: code, ...seat };
   });
   res.json(saved);

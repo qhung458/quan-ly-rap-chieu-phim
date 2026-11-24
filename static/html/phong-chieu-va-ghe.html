@@ -228,6 +228,16 @@
                   max="2147483647"
                   required
                 />
+                <label class="form-label" for="seat-type">Loại ghế</label>
+                <select
+                  class="form-select form-select-sm"
+                  id="seat-type"
+                  name="LoaiGhe"
+                  required
+                >
+                  <option value="Thuong">Thường</option>
+                  <option value="VIP">VIP</option>
+                </select>
               </div>
               <div class="d-flex flex-wrap gap-2">
                 <button
@@ -288,11 +298,12 @@
                     <th scope="col">Mã phòng</th>
                     <th scope="col">Hàng</th>
                     <th scope="col">Ghế</th>
+                    <th scope="col">Loại</th>
                   </tr>
                 </thead>
                 <tbody id="seat-rows">
                   <tr>
-                    <td colspan="4">Chọn một phòng để xem danh sách ghế.</td>
+                    <td colspan="5">Chọn một phòng để xem danh sách ghế.</td>
                   </tr>
                 </tbody>
               </table>
