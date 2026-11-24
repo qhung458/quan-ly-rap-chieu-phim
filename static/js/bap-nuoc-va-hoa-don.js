@@ -49,7 +49,8 @@
     $deleteCombo.prop('disabled', saving || !selectedCombo || !admin);
     $('#clear-combo').prop('disabled', !user || saving);
     $('#add-line').prop('disabled', !user || saving || !combos.length);
-    $('#invoice-submit').prop('disabled', !user || saving || !$customer.val() || !combos.length);
+    $('#invoice-submit').prop('disabled', !user || saving || !$customer.val() ||
+      !$lines.children().length || $lines.find('.line-combo').toArray().some(select => !select.value));
     $deleteInvoice.prop('hidden', !selectedInvoice || !admin).prop('disabled', saving);
   }
 
@@ -72,11 +73,11 @@
     syncButtons();
   }
 
-  function renderCombos() {
+  function renderCombos(rows) {
     $comboRows.empty();
-    $('#combo-count').text(combos.length + ' combo');
-    if (!combos.length) emptyRow($comboRows, 4, 'Không tìm thấy combo.');
-    for (const combo of combos) {
+    $('#combo-count').text(rows.length + ' combo');
+    if (!rows.length) emptyRow($comboRows, 4, 'Không tìm thấy combo.');
+    for (const combo of rows) {
       const active = combo.MaCombo === selectedCombo?.MaCombo;
       $comboRows.append($('<tr>').data('combo', combo).toggleClass('is-selected', active).append(
         $('<td>').append($('<button>', {
@@ -89,18 +90,30 @@
     }
   }
 
-  async function loadCombos() {
+  async function loadComboRows() {
     const version = ++comboVersion;
+    const keyword = $('#combo-search').val().trim();
     try {
-      const rows = await $.getJSON(comboApi, { q: $('#combo-search').val() });
-      if (version !== comboVersion) return;
-      combos = rows;
-      renderCombos();
-      refreshLineOptions();
-      syncButtons();
+      const rows = keyword ? await $.getJSON(comboApi, { q: keyword }) : combos;
+      if (version === comboVersion) renderCombos(rows);
     } catch (xhr) {
       if (version !== comboVersion) return;
       emptyRow($comboRows, 4, 'Không tải được danh mục combo.');
+      $('#combo-count').empty();
+      showError($comboMessage, xhr);
+    }
+  }
+
+  async function loadCombos() {
+    try {
+      combos = await $.getJSON(comboApi);
+      refreshLineOptions();
+      if (!$lines.children().length) addLine();
+      syncButtons();
+      await loadComboRows();
+    } catch (xhr) {
+      emptyRow($comboRows, 4, 'Không tải được danh mục combo.');
+      $('#combo-count').empty();
       showError($comboMessage, xhr);
     }
   }
@@ -157,7 +170,7 @@
   $('#combo-search').on('input', () => {
     comboVersion++;
     clearTimeout(comboTimer);
-    comboTimer = setTimeout(loadCombos, 250);
+    comboTimer = setTimeout(loadComboRows, 250);
   });
 
   /* ---------- Lập hóa đơn ---------- */
@@ -198,8 +211,7 @@
   function refreshLineOptions() {
     $lines.find('.line-combo').each(function () {
       const current = $(this).val();
-      $(this).empty().append(comboOptions(current));
-      if (!combos.some(combo => combo.MaCombo === $(this).val())) $(this).prop('selectedIndex', 0);
+      $(this).empty().append($('<option>', { value: '', text: 'Chọn combo…' }), comboOptions(current));
     });
     updateTotal();
   }
@@ -215,6 +227,7 @@
     });
     $lines.append($('<div class="invoice-line">').append($select, $quantity, $remove));
     updateTotal();
+    syncButtons();
   }
 
   function readLines() {
@@ -234,10 +247,14 @@
   }
 
   $('#add-line').on('click', addLine);
-  $lines.on('change input', '.line-combo, .line-quantity', updateTotal);
+  $lines.on('change input', '.line-combo, .line-quantity', () => {
+    updateTotal();
+    syncButtons();
+  });
   $lines.on('click', '.line-remove', function () {
     if ($lines.children().length > 1) $(this).closest('.invoice-line').remove();
     updateTotal();
+    syncButtons();
   });
   $customer.on('change', syncButtons);
   $('#customer-search').on('input', () => {
@@ -253,6 +270,10 @@
     $invoiceMessage.removeClass('text-danger').empty();
     if (!$customer.val()) {
       $invoiceMessage.addClass('text-danger').text('Chọn khách hàng.');
+      return;
+    }
+    if (!lines.length || lines.some(line => !line.MaCombo)) {
+      $invoiceMessage.addClass('text-danger').text('Chọn combo cho từng dòng hóa đơn.');
       return;
     }
     if (lines.some(line => !Number.isInteger(line.SoLuong) || line.SoLuong < 1 || line.SoLuong > 50)) {
@@ -415,10 +436,9 @@
     $('#account-name').text(user.HoTen + ' · ' +
       (user.VaiTro === 'QuanTriVien' ? 'Quản trị viên' : 'Nhân viên quầy'));
     $('#logout-button').prop('hidden', false);
-    $('#customer-search, #customer-search, #combo-search, #invoice-search, #invoice-from, #invoice-to, #invoice-customer')
+    $('#customer-search, #combo-search, #invoice-search, #invoice-from, #invoice-to, #invoice-customer')
       .prop('disabled', false);
     await loadCombos();
-    addLine();
     syncButtons();
     loadCustomers();
     loadInvoices();

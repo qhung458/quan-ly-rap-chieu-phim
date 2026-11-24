@@ -33,23 +33,6 @@
       <p class="page-description">Quản lý danh mục combo bắp nước và lập hóa đơn cho khách hàng.</p>
       <div class="food-layout">
         <div class="detail-stack">
-          <section class="panel" aria-labelledby="invoice-new-title">
-            <h2 id="invoice-new-title">Lập hóa đơn</h2>
-            <form id="invoice-form" class="form-stack" novalidate>
-              <label class="form-label" for="customer-search">Tìm khách hàng</label>
-              <input class="form-control" id="customer-search" type="search" placeholder="Mã, tên hoặc số điện thoại" disabled>
-              <label class="form-label" for="invoice-customer">Khách hàng</label>
-              <select class="form-select" id="invoice-customer" required disabled></select>
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="form-label mb-0">Combo</span>
-                <button class="btn btn-outline-dark btn-sm" id="add-line" type="button" disabled>Thêm dòng</button>
-              </div>
-              <div id="invoice-lines" class="invoice-lines"></div>
-              <p class="invoice-total">Tổng thanh toán: <strong id="invoice-total">0 ₫</strong></p>
-              <button class="btn btn-dark" id="invoice-submit" type="submit" disabled>Lưu hóa đơn</button>
-              <p class="form-message" id="invoice-message" role="status"></p>
-            </form>
-          </section>
           <section class="panel" aria-labelledby="combo-form-title">
             <h2 id="combo-form-title">Thông tin combo</h2>
             <form id="combo-form" class="form-stack">
@@ -70,8 +53,6 @@
               <p class="form-message" id="combo-message" role="status"></p>
             </form>
           </section>
-        </div>
-        <div class="detail-stack">
           <section class="panel" aria-labelledby="combos-title">
             <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
               <h2 id="combos-title" class="mb-0">Danh mục combo</h2>
@@ -93,9 +74,37 @@
               </table>
             </div>
           </section>
+        </div>
+        <div class="detail-stack">
+          <div class="invoice-panels">
+            <section class="panel" aria-labelledby="invoice-new-title">
+              <h2 id="invoice-new-title">Lập hóa đơn</h2>
+              <form id="invoice-form" class="form-stack" novalidate>
+                <label class="form-label" for="customer-search">Tìm khách hàng</label>
+                <input class="form-control" id="customer-search" type="search" placeholder="Mã, tên hoặc số điện thoại" disabled>
+                <label class="form-label" for="invoice-customer">Khách hàng</label>
+                <select class="form-select" id="invoice-customer" required disabled></select>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <span class="form-label mb-0">Combo</span>
+                  <button class="btn btn-outline-dark btn-sm" id="add-line" type="button" disabled>Thêm dòng</button>
+                </div>
+                <div id="invoice-lines" class="invoice-lines"></div>
+                <p class="invoice-total">Tổng thanh toán: <strong id="invoice-total">0 ₫</strong></p>
+                <button class="btn btn-dark" id="invoice-submit" type="submit" disabled>Lưu hóa đơn</button>
+                <p class="form-message" id="invoice-message" role="status"></p>
+              </form>
+            </section>
+            <section class="panel" aria-labelledby="invoice-detail-title">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h2 id="invoice-detail-title" class="mb-0">Chi tiết hóa đơn</h2>
+                <button class="btn btn-outline-dark btn-sm" id="delete-invoice" type="button" hidden>Xóa hóa đơn</button>
+              </div>
+              <div id="invoice-detail"><p class="text-secondary mb-0">Chọn một hóa đơn để xem chi tiết.</p></div>
+            </section>
+          </div>
           <section class="panel" aria-labelledby="invoices-title">
             <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
-              <h2 id="invoices-title" class="mb-0">Hóa đơn</h2>
+              <h2 id="invoices-title" class="mb-0">Danh sách hóa đơn</h2>
               <span id="invoice-count" class="text-secondary small" role="status"></span>
             </div>
             <div class="invoice-filter">
@@ -116,13 +125,6 @@
                 <tbody id="invoice-rows"><tr><td colspan="4">Đang tải hóa đơn…</td></tr></tbody>
               </table>
             </div>
-          </section>
-          <section class="panel" aria-labelledby="invoice-detail-title">
-            <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
-              <h2 id="invoice-detail-title" class="mb-0">Chi tiết hóa đơn</h2>
-              <button class="btn btn-outline-dark btn-sm" id="delete-invoice" type="button" hidden>Xóa hóa đơn</button>
-            </div>
-            <div id="invoice-detail"><p class="text-secondary mb-0">Chọn một hóa đơn để xem chi tiết.</p></div>
           </section>
         </div>
       </div>

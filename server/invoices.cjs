@@ -156,7 +156,7 @@ router.post('/', async (req, res) => {
         );
       }
       return invoiceCode;
-    }, 'hoa_don_ma');
+    }, 'rap_hd');
 
     res.status(201).json(await readInvoice(db, code));
   } catch (error) {
