@@ -51,7 +51,7 @@ router.get('/', async (req, res) => {
              COUNT(DISTINCT MaHoaDon) AS SoHoaDon, COALESCE(SUM(TongTien), 0) AS DoanhThu
       FROM HoaDon
       WHERE NgayMua >= ? AND NgayMua < DATE_ADD(?, INTERVAL 1 DAY)
-      GROUP BY DATE(NgayMua)
+      GROUP BY Ngay
     `, [from, to]),
     db.execute(`
       SELECT p.MaPhim, p.TenPhim, COUNT(v.MaVe) AS SoVe, COALESCE(SUM(v.GiaVe), 0) AS DoanhThu
