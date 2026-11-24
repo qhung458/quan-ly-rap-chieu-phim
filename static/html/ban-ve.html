@@ -45,42 +45,39 @@
         Chọn phim, suất chiếu, ghế và khách hàng để bán vé tại quầy.
       </p>
       <div class="ticket-layout">
-        <div class="detail-stack">
-          <section class="panel" aria-labelledby="seats-title">
-            <h2 id="seats-title">Chọn ghế <span id="seat-show"></span></h2>
-            <div class="seat-screen">Màn hình</div>
-            <div class="seat-scroll">
-              <div
-                id="seat-map"
-                class="seat-map"
-                role="group"
-                aria-label="Sơ đồ ghế"
-              ></div>
-            </div>
-            <ul class="seat-legend" aria-label="Chú giải ghế">
-              <li><span class="seat-key" aria-hidden="true"></span> Trống</li>
-              <li>
-                <span class="seat-key is-occupied" aria-hidden="true"></span> Đã
-                đặt
-              </li>
-              <li>
-                <span class="seat-key is-selected" aria-hidden="true"></span>
-                Đang chọn
-              </li>
-              <li>
-                <span class="seat-key is-vip" aria-hidden="true"></span> Ghế VIP
-              </li>
-            </ul>
-          </section>
+        <section class="panel seat-panel" aria-labelledby="seats-title">
+          <h2 id="seats-title">Chọn ghế <span id="seat-show"></span></h2>
+          <div class="seat-screen">Màn hình</div>
+          <div class="seat-scroll">
+            <div
+              id="seat-map"
+              class="seat-map"
+              role="group"
+              aria-label="Sơ đồ ghế"
+            ></div>
+          </div>
+          <ul class="seat-legend" aria-label="Chú giải ghế">
+            <li><span class="seat-key" aria-hidden="true"></span> Trống</li>
+            <li>
+              <span class="seat-key is-occupied" aria-hidden="true"></span> Đã
+              đặt
+            </li>
+            <li>
+              <span class="seat-key is-selected" aria-hidden="true"></span>
+              Đang chọn
+            </li>
+            <li>
+              <span class="seat-key is-vip" aria-hidden="true"></span> Ghế VIP
+            </li>
+          </ul>
           <p
             class="ticket-feedback small mb-0"
             id="ticket-message"
             role="status"
             aria-atomic="true"
           ></p>
-        </div>
-        <div class="detail-stack">
-          <section class="panel" aria-labelledby="ticket-title">
+        </section>
+        <section class="panel" aria-labelledby="ticket-title">
             <h2 id="ticket-title">Thông tin vé</h2>
             <form id="ticket-form">
               <div class="ticket-fields mb-3">
@@ -196,56 +193,48 @@
                 </button>
               </div>
             </form>
-          </section>
-          <section class="panel" aria-labelledby="search-title">
-            <h2 id="search-title">Tìm kiếm vé</h2>
-            <form id="ticket-search">
-              <div class="ticket-fields mb-3">
-                <label class="form-label" for="search-ticket-id">Mã vé</label>
-                <input
-                  class="form-control form-control-sm"
-                  id="search-ticket-id"
-                  type="search"
-                  maxlength="15"
-                  disabled
-                />
-                <label class="form-label" for="search-customer-id"
-                  >Mã khách hàng</label
-                >
-                <input
-                  class="form-control form-control-sm"
-                  id="search-customer-id"
-                  type="search"
-                  maxlength="10"
-                  disabled
-                />
-              </div>
-              <div class="d-flex flex-wrap gap-2">
-                <button class="btn btn-dark btn-sm" type="submit" disabled>
-                  Tìm kiếm
-                </button>
-                <button
-                  class="btn btn-outline-secondary btn-sm"
-                  id="clear-search"
-                  type="button"
-                  disabled
-                >
-                  Hủy tìm kiếm
-                </button>
-              </div>
-            </form>
-          </section>
-        </div>
+        </section>
         <section class="panel ticket-list" aria-labelledby="tickets-title">
-          <div
-            class="d-flex justify-content-between align-items-center gap-3 mb-3"
-          >
-            <h2 id="tickets-title" class="mb-0">Vé của suất chiếu</h2>
-            <span
-              id="ticket-count"
-              class="text-secondary small"
-              role="status"
-            ></span>
+          <div class="ticket-list-heading mb-3">
+            <div class="ticket-list-title">
+              <h2 id="tickets-title" class="mb-0">Vé của suất chiếu</h2>
+              <span
+                id="ticket-count"
+                class="text-secondary small"
+                role="status"
+              ></span>
+            </div>
+            <form id="ticket-search" class="ticket-search">
+              <input
+                class="form-control form-control-sm"
+                id="search-ticket-id"
+                type="search"
+                maxlength="15"
+                placeholder="Mã vé"
+                aria-label="Tìm theo mã vé"
+                disabled
+              />
+              <input
+                class="form-control form-control-sm"
+                id="search-customer-id"
+                type="search"
+                maxlength="10"
+                placeholder="Mã khách hàng"
+                aria-label="Tìm theo mã khách hàng"
+                disabled
+              />
+              <button class="btn btn-dark btn-sm" type="submit" disabled>
+                Tìm
+              </button>
+              <button
+                class="btn btn-outline-secondary btn-sm"
+                id="clear-search"
+                type="button"
+                disabled
+              >
+                Xóa lọc
+              </button>
+            </form>
           </div>
           <div class="table-responsive">
             <table
