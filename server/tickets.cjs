@@ -162,7 +162,7 @@ router.put('/doi', async (req, res) => {
     const destination = await readDestination(connection, showCode, seatCode);
     const sameShow = old.MaSuatChieu === destination.MaSuatChieu;
     if (sameShow && old.MaGhe === destination.MaGhe) throw new TicketError(400, 'Chọn ghế hoặc suất chiếu mới.');
-
+    // đỏi vé
     await connection.execute(`
       UPDATE Ve v SET MaSuatChieu = ?, MaGhe = ?, GiaVe = ? WHERE ${ticketKeyCondition}
     `, [destination.MaSuatChieu, destination.MaGhe, sameShow ? old.GiaVe : destination.GiaVe, ...key]);
