@@ -48,21 +48,22 @@ function escapeHTML(value) {
 }
 
 // -------------------- ĐIỀU HƯỚNG --------------------
-document.querySelectorAll(".nav-item").forEach(button => {
-    button.addEventListener("click", () => {
-        document.querySelectorAll(".nav-item").forEach(item => item.classList.remove("active"));
-        button.classList.add("active");
+function showSection() {
+    const showtimes = location.hash === "#showtimesPage";
+    const current = showtimes ? "#showtimesPage" : "#moviesPage";
 
-        const page = button.dataset.page;
-        document.getElementById("moviesPage").classList.toggle("hidden", page !== "movies");
-        document.getElementById("showtimesPage").classList.toggle("hidden", page !== "showtimes");
-        document.getElementById("placeholderPage").classList.toggle("hidden", page === "movies" || page === "showtimes");
-
-        if (page !== "movies" && page !== "showtimes") {
-            document.getElementById("placeholderTitle").textContent = button.textContent.trim();
-        }
+    document.getElementById("moviesPage").classList.toggle("hidden", showtimes);
+    document.getElementById("showtimesPage").classList.toggle("hidden", !showtimes);
+    document.querySelectorAll('.nav-item[href^="#"]').forEach(link => {
+        const active = link.getAttribute("href") === current;
+        link.classList.toggle("active", active);
+        if (active) link.setAttribute("aria-current", "location");
+        else link.removeAttribute("aria-current");
     });
-});
+}
+
+window.addEventListener("hashchange", showSection);
+showSection();
 
 // -------------------- QUẢN LÝ PHIM --------------------
 const movieForm = document.getElementById("movieForm");
@@ -553,10 +554,22 @@ document.getElementById("clearShowtimeFilter").addEventListener("click", () => {
 
     renderShowtimes();
 });
-["accountLink", "backLink", "logoutLink"].forEach(id => {
-    document.getElementById(id).addEventListener("click", event => {
+document.getElementById("backLink").addEventListener("click", event => {
+    if (document.referrer.startsWith(location.origin + "/")) {
         event.preventDefault();
-    });
+        history.back();
+    }
+});
+
+document.getElementById("logoutLink").addEventListener("click", async event => {
+    event.preventDefault();
+    try {
+        const response = await fetch("/api/auth/logout", { method: "POST" });
+        if (!response.ok) throw new Error("Logout failed");
+        location.assign("dang-nhap.html");
+    } catch {
+        alert("Không thể đăng xuất. Vui lòng thử lại.");
+    }
 });
 
 
