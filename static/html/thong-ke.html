@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Thống kê | Quản lý rạp chiếu phim</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <link rel="stylesheet" href="../css/rap-chieu-phim.css">
+    <link rel="stylesheet" href="../css/thong-ke.css">
+  </head>
+  <body class="app-layout">
+    <header class="app-header d-flex align-items-center justify-content-between gap-3">
+      <a class="brand" href="dang-nhap.html"><span aria-hidden="true">▶</span> Quản lý rạp chiếu phim</a>
+      <div class="d-flex align-items-center gap-3">
+        <span id="account-name" class="small"></span>
+        <button id="logout-button" class="btn btn-outline-dark btn-sm" type="button" hidden>Đăng xuất</button>
+      </div>
+    </header>
+    <nav class="sidebar" aria-label="Điều hướng chính">
+      <ul class="menu-list">
+        <li><a href="dang-nhap.html">Đăng nhập</a></li>
+        <li><a href="phim-va-suatchieu.html#moviesPage">Phim</a></li>
+        <li><a href="phong-chieu-va-ghe.html">Phòng chiếu và ghế</a></li>
+        <li><a href="phim-va-suatchieu.html#showtimesPage">Suất chiếu</a></li>
+        <li><a href="ban-ve.html">Bán vé</a></li>
+        <li><a href="khach-hang.html">Khách hàng</a></li>
+        <li><a href="bap-nuoc-va-hoa-don.html">Bắp nước và hóa đơn</a></li>
+        <li><a href="thong-ke.html" aria-current="page">Thống kê</a></li>
+      </ul>
+    </nav>
+    <main class="main-content">
+      <h1>Thống kê</h1>
+      <p class="page-description">Tổng hợp doanh thu vé và bắp nước theo khoảng ngày.</p>
+      <section class="panel stats-filter" aria-label="Khoảng thời gian">
+        <form id="stats-form" class="stats-form">
+          <div>
+            <label class="form-label" for="stats-from">Từ ngày</label>
+            <input class="form-control" type="date" id="stats-from" required>
+          </div>
+          <div>
+            <label class="form-label" for="stats-to">Đến ngày</label>
+            <input class="form-control" type="date" id="stats-to" required>
+          </div>
+          <button class="btn btn-dark" type="submit" disabled>Xem thống kê</button>
+        </form>
+        <p class="form-message" id="stats-message" role="status"></p>
+      </section>
+      <div class="stat-tiles" id="stat-tiles" aria-live="polite"></div>
+      <div class="stats-grid">
+        <section class="panel" aria-labelledby="period-title">
+          <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+            <h2 id="period-title" class="mb-0">Doanh thu theo thời gian</h2>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Nhóm theo">
+              <button type="button" class="btn btn-dark" id="by-day" aria-pressed="true">Ngày</button>
+              <button type="button" class="btn btn-outline-dark" id="by-month" aria-pressed="false">Tháng</button>
+            </div>
+          </div>
+          <div class="table-responsive stats-scroll">
+            <table class="table align-middle mb-0" aria-labelledby="period-title">
+              <thead>
+                <tr>
+                  <th scope="col" id="period-head">Ngày</th>
+                  <th scope="col" class="text-end">Vé</th>
+                  <th scope="col" class="text-end">Doanh thu vé</th>
+                  <th scope="col" class="text-end">Hóa đơn</th>
+                  <th scope="col" class="text-end">Bắp nước</th>
+                  <th scope="col" class="text-end">Tổng</th>
+                </tr>
+              </thead>
+              <tbody id="period-rows"><tr><td colspan="6">Đang tải thống kê…</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+        <div class="detail-stack">
+          <section class="panel" aria-labelledby="film-title">
+            <h2 id="film-title">Doanh thu vé theo phim</h2>
+            <div class="table-responsive stats-scroll">
+              <table class="table align-middle mb-0" aria-labelledby="film-title">
+                <thead>
+                  <tr>
+                    <th scope="col">Phim</th>
+                    <th scope="col" class="text-end">Vé</th>
+                    <th scope="col">Doanh thu</th>
+                  </tr>
+                </thead>
+                <tbody id="film-rows"></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="panel" aria-labelledby="combo-stat-title">
+            <h2 id="combo-stat-title">Doanh thu theo combo</h2>
+            <div class="table-responsive stats-scroll">
+              <table class="table align-middle mb-0" aria-labelledby="combo-stat-title">
+                <thead>
+                  <tr>
+                    <th scope="col">Combo</th>
+                    <th scope="col" class="text-end">Số lượng</th>
+                    <th scope="col">Doanh thu</th>
+                  </tr>
+                </thead>
+                <tbody id="combo-stat-rows"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+      <p class="stats-note">Doanh thu vé tính theo ngày chiếu, không gồm vé đã hủy và suất bị hủy. Doanh thu bắp nước tính theo ngày lập hóa đơn.</p>
+    </main>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="../js/thong-ke.js"></script>
+  </body>
+</html>
