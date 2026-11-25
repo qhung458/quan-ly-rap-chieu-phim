@@ -61,7 +61,7 @@ async function refreshOptions() {
   byId('page-error').textContent = failed ? 'Không thể tải tất cả tùy chọn phim và phòng. Hãy bấm Tải lại để thử lại.' : '';
 }
 
-function makeCatalog({ id, key, label, defaultSort, labels, cells, onMutation }) {
+function makeCatalog({ id, key, label, defaultSort, labels, cells, onMutation, rowAction }) {
   const section = byId(id);
   const filterForm = section.querySelector('[data-query-form]');
   const filters = Array.from(filterForm.querySelectorAll('[name]'));
@@ -78,6 +78,7 @@ function makeCatalog({ id, key, label, defaultSort, labels, cells, onMutation })
   const fieldset = form.querySelector('fieldset');
   const table = section.querySelector('table');
   const body = table.tBodies[0];
+  const actionHeading = table.querySelector('[data-row-action]');
   const count = section.querySelector('[data-count]');
   const save = form.querySelector('[data-save]');
   const remove = form.querySelector('[data-delete]');
@@ -174,7 +175,7 @@ function makeCatalog({ id, key, label, defaultSort, labels, cells, onMutation })
   function emptyTable(text) {
     const row = body.insertRow();
     const cell = row.insertCell();
-    cell.colSpan = table.tHead.rows[0].cells.length;
+    cell.colSpan = table.tHead.rows[0].cells.length - (actionHeading?.hidden ? 1 : 0);
     cell.textContent = text;
   }
 
@@ -214,6 +215,7 @@ function makeCatalog({ id, key, label, defaultSort, labels, cells, onMutation })
       });
       row.insertCell().append(button);
       for (const value of cells(item)) row.insertCell().textContent = value;
+      if (actionHeading && !actionHeading.hidden) row.insertCell().append(rowAction(item));
     }
   }
 
@@ -292,6 +294,7 @@ function makeCatalog({ id, key, label, defaultSort, labels, cells, onMutation })
     load: controller.refresh,
     enableQuery: () => { filterForm.querySelector('fieldset').disabled = false; },
     enableEditor: () => { if (!saving) fieldset.disabled = false; },
+    enableRowActions: () => { if (actionHeading) actionHeading.hidden = false; },
     refreshConditions: () => renderConditions(controller.getState().applied)
   };
 }
@@ -319,6 +322,36 @@ function showtimeCatalogCells(show) {
   ]
 }
 
+const ticketDialog = byId('show-ticket-dialog');
+let ticketReview;
+let ticketReviewTrigger;
+
+function showtimeTicketButton(show) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'btn btn-outline-dark btn-sm text-nowrap';
+  button.textContent = 'Xem vé';
+  button.setAttribute('aria-label', 'Xem vé suất ' + show.MaSuatChieu);
+  button.setAttribute('aria-haspopup', 'dialog');
+  button.addEventListener('click', () => {
+    ticketReview ??= ShowTicketList.mount(byId('show-ticket-list'), { exportId: 'show-ticket-export' });
+    ticketReviewTrigger = button;
+    byId('show-ticket-title').textContent = 'Vé suất ' + show.MaSuatChieu;
+    byId('show-ticket-description').textContent = [show.TenPhim ?? show.MaPhim, show.TenPhong ?? show.MaPhong,
+      formatDate(show.NgayChieu) + ' ' + show.GioBatDau].join(' · ');
+    if (!ticketDialog.open) ticketDialog.showModal();
+    ticketReview.setShow(show.MaSuatChieu);
+  });
+  return button;
+}
+
+ticketDialog.addEventListener('close', () => {
+  if (ticketDialog.open) return;
+  ticketReview?.setShow(null);
+  if (ticketReviewTrigger?.isConnected) ticketReviewTrigger.focus();
+  ticketReviewTrigger = undefined;
+});
+
 const showtimeCatalog = makeCatalog({
   id: 'suat-chieu',
   key: 'MaSuatChieu',
@@ -327,7 +360,8 @@ const showtimeCatalog = makeCatalog({
   labels: { q: 'Từ khóa', maSuatChieu: 'Mã suất', tenPhim: 'Tên phim', tenPhong: 'Tên phòng',
     maPhim: 'Phim', maPhong: 'Phòng', trangThai: 'Trạng thái', tuNgay: 'Chiếu từ', denNgay: 'Chiếu đến',
     gioTu: 'Bắt đầu từ giờ', gioDen: 'Bắt đầu đến giờ', giaMin: 'Giá vé từ', giaMax: 'Giá vé đến' },
-  cells: showtimeCatalogCells
+  cells: showtimeCatalogCells,
+  rowAction: showtimeTicketButton
 });
 
 function suggestEnd() {
@@ -373,6 +407,7 @@ async function initialize() {
     movieCatalog.enableQuery();
     movieCatalog.enableEditor();
     showtimeCatalog.enableQuery();
+    if (account.VaiTro === 'QuanTriVien') showtimeCatalog.enableRowActions();
     await Promise.all([
       movieCatalog.load(),
       showtimeCatalog.load(),

@@ -1,3 +1,7 @@
 node_modules/
 .env
-test/
+/test/*
+!/test/g5.integration.test.cjs
+!/test/fixtures/
+/test/fixtures/*
+!/test/fixtures/mysql-app.cjs

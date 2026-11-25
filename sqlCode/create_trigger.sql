@@ -61,7 +61,7 @@ BEGIN
     IF v_BatDau <= NOW() OR v_BatDau < DATE_ADD(NOW(), INTERVAL v_PhutBan MINUTE) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Suat chieu da qua han ban ve.';
     END IF;
-END $$
+END //
 
 
 

@@ -1,11 +1,16 @@
 const express = require('express');
 const db = require('./db.cjs');
-const { requireLogin } = require('./auth.cjs');
+const { requireLogin, requireAdmin } = require('./auth.cjs');
+const { vietnameseSearchColumn } = require('./list-query.cjs');
+const { SnapshotError } = require('./list-snapshots.cjs');
+const { createSnapshotList } = require('./snapshot-list.cjs');
+const snapshotStore = require('./snapshot-store.cjs');
 const transaction = require('./transaction.cjs');
 
 const router = express.Router();
 router.use(requireLogin);
 const maxSeatsPerSale = 130;
+const statusLabels = { DaDat: 'Đã đặt', DaSuDung: 'Đã sử dụng', DaHuy: 'Đã hủy' };
 
 const showQuery = `
   SELECT sc.MaSuatChieu, p.MaPhim, p.TenPhim, sc.MaPhong, pc.TenPhong, sc.GiaVe, sc.TrangThai,
@@ -104,6 +109,74 @@ async function readTicket(connection, key) {
   return ticket;
 }
 
+function addCodeCondition(conditions, params, column, code, mode) {
+  if (!code) return;
+  conditions.push(mode === 'exact' ? `${column} = ?` :
+    `LOCATE(CAST(LOWER(?) AS BINARY), CAST(LOWER(${column}) AS BINARY)) > 0`);
+  params.push(code);
+}
+
+function excelDate(value) {
+  const [date, time] = value.split(' ');
+  return new Date(`${date.split('/').reverse().join('-')}T${time}:00Z`);
+}
+
+const ticketList = createSnapshotList({
+  store: snapshotStore,
+  pool: db,
+  scope: req => 'ban-ve:suat-chieu:ve:' + readCode(req.params.showCode, 20),
+  query: {
+    accentInsensitive: true,
+    searchColumns: ['v.MaVe', 'v.MaKhachHang', 'kh.TenKhachHang'].map(vietnameseSearchColumn),
+    phoneColumn: 'kh.SoDienThoai',
+    filters: {
+      maVe: { type: 'exact', maxLength: 15 },
+      maVeMode: { type: 'enum', values: ['exact', 'contains'] },
+      maKhachHang: { type: 'exact', maxLength: 10 },
+      maKhachHangMode: { type: 'enum', values: ['exact', 'contains'] },
+      soDienThoai: { type: 'phone', column: 'kh.SoDienThoai' },
+      hang: { type: 'exact', column: 'g.SoHang', maxLength: 5 },
+      soGhe: { type: 'integer', column: 'g.SoGhe', min: 1, max: 2147483647 },
+      tuNgay: { type: 'date', column: 'v.NgayDat', operator: '>=' },
+      denNgay: { type: 'date', column: 'v.NgayDat', operator: 'throughDate' },
+      trangThai: { type: 'enum', column: 'v.TrangThai', multiple: true, values: Object.keys(statusLabels) }
+    },
+    ranges: [['tuNgay', 'denNgay']],
+    sort: { ngayDat: 'v.NgayDat', viTri: ['CHAR_LENGTH(g.SoHang)', 'g.SoHang', 'g.SoGhe'], maVe: 'v.MaVe' },
+    defaultSort: 'ngayDat:desc',
+    tieBreakers: ['v.MaVe', 'v.MaSuatChieu', 'v.MaKhachHang', 'v.MaGhe']
+  },
+  async load(connection, { conditions, params, orderBy, filters }, req) {
+    const showCode = readCode(req.params.showCode, 20);
+    const [[show]] = await connection.execute(`
+      SELECT s.MaSuatChieu, EXISTS (SELECT 1 FROM Ve v WHERE v.MaSuatChieu = s.MaSuatChieu) AS hasTickets
+      FROM SuatChieu s WHERE s.MaSuatChieu = ?
+    `, [showCode]);
+    if (!show) throw new SnapshotError(404, 'SHOW_NOT_FOUND', 'Không tìm thấy suất chiếu.');
+    const meta = { hasTickets: Boolean(show.hasTickets) };
+    if (!meta.hasTickets) return { items: [], meta };
+
+    addCodeCondition(conditions, params, 'v.MaVe', filters.maVe, filters.maVeMode);
+    addCodeCondition(conditions, params, 'v.MaKhachHang', filters.maKhachHang, filters.maKhachHangMode);
+    const [items] = await connection.execute(`
+      ${ticketQuery}
+      WHERE ${['v.MaSuatChieu = ?', ...conditions].join(' AND ')}
+      ORDER BY ${orderBy}
+    `, [show.MaSuatChieu, ...params]);
+    return { items, meta };
+  },
+  workbook: ({ items }) => ({
+    filename: 've-theo-suat',
+    sheets: [{
+      name: 'Vé theo suất',
+      columns: [['Mã vé', 18], ['Mã suất chiếu', 22], ['Ghế', 14], ['Ngày đặt', 22, 'dd/mm/yyyy hh:mm'],
+        ['Giá', 18, '#,##0.##" ₫"'], ['Trạng thái', 18], ['Mã khách', 16]],
+      rows: items.map(ticket => [ticket.MaVe, ticket.MaSuatChieu, `${ticket.SoHang}-${ticket.SoGhe}`,
+        excelDate(ticket.NgayDat), Number(ticket.GiaVe), statusLabels[ticket.TrangThai], ticket.MaKhachHang])
+    }]
+  })
+});
+
 router.get('/suat-chieu', async (_req, res) => {
   const [rows] = await db.query(`${showQuery} ORDER BY sc.NgayChieu, sc.GioBatDau, sc.MaSuatChieu`);
   res.json(rows.map(showPermissions).filter(show => show.CoTheBan));
@@ -120,12 +193,21 @@ router.get('/suat-chieu/:showCode', async (req, res) => {
       LEFT JOIN Ve v ON v.MaSuatChieu = ? AND v.MaGheChiemCho = g.MaGhe
       WHERE g.MaPhong = ? ORDER BY CHAR_LENGTH(g.SoHang), g.SoHang, g.SoGhe, g.MaGhe
     `, [show.MaSuatChieu, show.MaPhong]);
-    const [tickets] = await connection.execute(`
-      ${ticketQuery} WHERE v.MaSuatChieu = ? ORDER BY v.NgayDat DESC, v.MaVe, v.MaKhachHang, v.MaGhe
-    `, [show.MaSuatChieu]);
-    return { suatChieu: showPermissions(show), ghe: seats, ve: tickets };
+    return { suatChieu: showPermissions(show), ghe: seats };
   });
   res.json(detail);
+});
+
+router.get('/suat-chieu/:showCode/ve', ticketList.list);
+router.get('/suat-chieu/:showCode/ve/xuat', requireAdmin, ticketList.exportXlsx);
+router.get('/suat-chieu/:showCode/ve/chi-tiet', async (req, res) => {
+  const key = readTicketKey({
+    MaVe: req.query.maVe, MaSuatChieu: req.params.showCode,
+    MaKhachHang: req.query.maKhachHang, MaGhe: req.query.maGhe
+  });
+  const ticket = await readTicket(db, key);
+  if (!ticket) throw new TicketError(404, 'Không tìm thấy vé. Tải lại danh sách để kiểm tra.');
+  res.json(ticket);
 });
 
 router.get('/khach-hang', async (_req, res) => {

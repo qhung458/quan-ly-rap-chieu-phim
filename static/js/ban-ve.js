@@ -1,4 +1,4 @@
-/* global jQuery */
+/* global jQuery, ListQuery, ShowTicketList */
 (() => {
   if (!window.jQuery) return;
 
@@ -11,10 +11,13 @@
   const $show = $('#ticket-show');
   const $customer = $('#ticket-customer');
   const $customerSearch = $('#ticket-customer-search');
+  const $customerMessage = $('#ticket-customer-search-status');
+  const $customerMore = $('#ticket-customer-more');
   const $seatMap = $('#seat-map');
-  const $ticketRows = $('#ticket-rows');
-  const $search = $('#ticket-search');
   const $message = $('#ticket-message');
+  const ticketList = ShowTicketList.mount(document.getElementById('ticket-list-content'), { onSelect: selectTicket });
+  const lookupCustomers = ListQuery.loadFrom('/api/khach-hang/tuy-chon');
+  const customerPageSize = 20;
 
   let ready = false;
   let loading = false;
@@ -23,14 +26,19 @@
   let shows = [];
   let show = null;
   let seats = [];
-  let tickets = [];
   let customers = [];
+  let saleCustomer = null;
+  let customerPage = 0;
+  let customerTotal = 0;
+  let customerTimer;
+  let customerRequest;
+  let customerError = '';
+  let pickCustomerOnLoad = false;
   let selectedSeat = null;
   let selectedSeats = [];
   let selectedTicket = null;
+  let ticketRequest;
   let moving = false;
-  let ticketQuery = '';
-  let customerQuery = '';
 
   function showMessage(message, isError = false) {
     $message.toggleClass('text-danger', isError).text(message);
@@ -41,15 +49,11 @@
       location.assign('dang-nhap.html');
       return;
     }
-    showMessage(xhr?.responseJSON?.message || 'Không kết nối được máy chủ.', true);
+    showMessage(xhr?.responseJSON?.message || xhr?.message || 'Không kết nối được máy chủ.', true);
   }
 
   function seatLabel(item) {
     return item ? item.SoHang + item.SoGhe : '';
-  }
-
-  function ticketKey(ticket) {
-    return JSON.stringify([ticket.MaVe, ticket.MaSuatChieu, ticket.MaKhachHang, ticket.MaGhe]);
   }
 
   function ticketReference(ticket) {
@@ -57,40 +61,108 @@
     return { MaVe, MaSuatChieu, MaKhachHang, MaGhe };
   }
 
-  function normalizeCustomerSearch(text) {
-    return text.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd').trim();
+  function showUrl(code) {
+    return api + '/suat-chieu/' + encodeURIComponent(code);
   }
 
-  function customerOption({ MaKhachHang, TenKhachHang, SoDienThoai }) {
+  function customerOption({ MaKhachHang, TenKhachHang, SoDienThoai }, pinned = false) {
     return $('<option>', {
       value: MaKhachHang,
-      text: [MaKhachHang, TenKhachHang, SoDienThoai].filter(Boolean).join(' - ')
+      text: [MaKhachHang, TenKhachHang, SoDienThoai].filter(Boolean).join(' - ') +
+        (pinned ? ' (đang chọn)' : '')
     })[0];
   }
 
-  function renderCustomerOptions(selectedCode = $customer.val()) {
-    const query = normalizeCustomerSearch($customerSearch.val());
-    const terms = query.split(/\s+/).filter(Boolean);
-    const phoneQuery = /^[\d+().\s-]+$/.test(query) ? query.replace(/\D/g, '') : '';
-    const matches = customers.filter(customer => {
-      if (phoneQuery) return customer.phoneDigits.includes(phoneQuery) || customer.searchText.includes(query);
-      return terms.every(term => customer.searchText.includes(term));
-    });
-    const options = matches.map(customerOption);
+  function customerPending() {
+    return customerTimer !== undefined || Boolean(customerRequest);
+  }
 
-    if (selectedTicket && !matches.some(customer => customer.MaKhachHang === selectedCode)) {
-      options.push(customerOption(selectedTicket));
+  function renderCustomerOptions() {
+    const picked = selectedTicket ?? saleCustomer;
+    const options = customers.map(customer => customerOption(customer));
+    const pinned = picked && !customers.some(customer => customer.MaKhachHang === picked.MaKhachHang);
+    if (pinned) {
+      options.unshift(customerOption(picked, !selectedTicket));
     }
+    $customer.empty().append($('<option>', { value: '', text: 'Chọn khách hàng' }), options)
+      .val(picked?.MaKhachHang ?? '');
+    const status = customerPending() ? 'Đang tìm khách hàng…' : customerError || (customerPage
+      ? (customerTotal ? `${customers.length} / ${customerTotal} khách hàng` : 'Không tìm thấy khách hàng.') : '');
+    const retained = pinned && !selectedTicket ? `Vẫn chọn khách ${saleCustomer.MaKhachHang}.` : '';
+    $customerMessage.toggleClass('text-danger', Boolean(customerError)).text([status, retained].filter(Boolean).join(' '));
+  }
 
-    $customer.empty().append($('<option>', { value: '', text: 'Chọn khách hàng' }), options).val(selectedCode);
-    if ($customer.val() == null) $customer.val('');
-    $('#ticket-customer-search-status').text(terms.length
-      ? (matches.length ? matches.length + ' khách hàng phù hợp' : 'Không tìm thấy khách hàng.') : '');
+  function cancelCustomerLookup() {
+    clearTimeout(customerTimer);
+    customerTimer = undefined;
+    const previous = customerRequest;
+    customerRequest = null;
+    previous?.abort();
+    pickCustomerOnLoad = false;
+  }
+
+  function clearCustomerResults() {
+    cancelCustomerLookup();
+    customers = [];
+    customerPage = 0;
+    customerTotal = 0;
+    customerError = '';
   }
 
   function resetCustomerPicker() {
+    clearCustomerResults();
+    saleCustomer = null;
     $customerSearch.val('');
-    renderCustomerOptions(selectedTicket?.MaKhachHang ?? '');
+    renderCustomerOptions();
+  }
+
+  function chooseOnlyCustomer() {
+    if ($customer.prop('disabled')) return;
+    if (customerTotal === 1 && customers.length === 1) {
+      saleCustomer = customers[0];
+      renderCustomerOptions();
+      renderSelection();
+    }
+    if (customers.length) $customer.trigger('focus');
+  }
+
+  async function loadCustomers(page = 1) {
+    const request = new AbortController();
+    const previous = customerRequest;
+    customerRequest = request;
+    previous?.abort();
+    customerError = '';
+    renderCustomerOptions();
+    renderSelection();
+    try {
+      const result = await lookupCustomers({ q: $customerSearch.val(), page, pageSize: customerPageSize }, { signal: request.signal });
+      if (customerRequest !== request) return;
+      const byCode = new Map((page === 1 ? [] : customers).map(customer => [customer.MaKhachHang, customer]));
+      for (const customer of result.items) byCode.set(customer.MaKhachHang, customer);
+      customers = [...byCode.values()];
+      customerPage = result.page;
+      customerTotal = result.total;
+      saleCustomer = byCode.get(saleCustomer?.MaKhachHang) ?? saleCustomer;
+    } catch (error) {
+      if (customerRequest !== request) return;
+      if (error.status === 401) location.assign('dang-nhap.html');
+      customerError = error.message || 'Không tải được khách hàng.';
+    } finally {
+      if (customerRequest === request) {
+        customerRequest = null;
+        const shouldPick = pickCustomerOnLoad;
+        pickCustomerOnLoad = false;
+        renderCustomerOptions();
+        renderSelection();
+        if (shouldPick && !customerError) chooseOnlyCustomer();
+      }
+    }
+  }
+
+  function loadInitialCustomers() {
+    if (show?.CoTheBan && !moving && !selectedTicket && !customerPending() && !customerPage && !customerError) {
+      loadCustomers();
+    }
   }
 
   function feedbackForShow() {
@@ -142,7 +214,7 @@
   }
 
   function renderSelection() {
-    const active = ready && Boolean(show) && !loading && !saving;
+    const active = ready && Boolean(show) && !loading && !saving && !ticketRequest;
     const viewing = Boolean(selectedTicket) && !moving;
     const canChooseSeat = active && Boolean(show?.CoTheBan);
     const canChange = active && viewing && selectedTicket.TrangThai === 'DaDat' && show.CoTheHuyDoi;
@@ -172,9 +244,10 @@
 
     $film.prop('disabled', !ready || saving || !shows.length);
     $show.prop('disabled', !ready || saving || !$film.val());
-    $customer.add($customerSearch).prop('disabled', !active || Boolean(selectedTicket) || !show.CoTheBan);
-    if (selectedTicket) $customer.val(selectedTicket.MaKhachHang);
-    const customerCode = $customer.val();
+    const canPickCustomer = active && !selectedTicket && show.CoTheBan;
+    $customer.add($customerSearch).prop('disabled', !canPickCustomer);
+    const moreCustomers = customerPage * customerPageSize < customerTotal;
+    $customerMore.prop({ hidden: !canPickCustomer || !moreCustomers, disabled: !canPickCustomer || customerPending() });
     const ticketSeats = viewing ? [selectedTicket] : selectedForSale;
     $('#ticket-seat').val(ticketSeats.map(seatLabel).join(', '));
     $('#ticket-date').val(selectedTicket?.NgayDat ?? '');
@@ -187,60 +260,18 @@
       $('#ticket-price').val(priceFormat.format(price) + ' · ' + selectedSeats.length + ' vé');
     }
     const hasSeatSelection = moving ? Boolean(selectedSeat) : selectedSeats.length > 0;
+    const canSave = moving || (saleCustomer && !customerPending());
     $('#save-ticket').text(moving ? 'Lưu đổi' : 'Lưu vé')
-      .prop('disabled', !active || !show.CoTheBan || viewing || !hasSeatSelection || !(customerCode || moving));
+      .prop('disabled', !active || !show.CoTheBan || viewing || !hasSeatSelection || !canSave);
     $('#move-ticket, #cancel-ticket').prop('disabled', !canChange);
     $('#clear-ticket').text(moving ? 'Bỏ đổi' : 'Làm mới')
       .prop('disabled', !ready || saving || (!moving && !$show.val()));
     $('#logout-button').prop('disabled', saving);
-    $search.find(':input').prop('disabled', !active);
-
-    const selectedKey = selectedTicket && ticketKey(selectedTicket);
-    $ticketRows.find('[data-ticket-id]').each(function () {
-      const $row = $(this);
-      const isSelected = ticketKey($row.data('ticket')) === selectedKey;
-      $row.toggleClass('is-selected', isSelected).find('.ticket-selector')
-        .attr('aria-pressed', String(isSelected)).prop('disabled', saving || moving);
-    });
-  }
-
-  function emptyTickets(message) {
-    $ticketRows.empty().append($('<tr>').append($('<td>', { colspan: 7, text: message })));
-  }
-
-  function matchesSearch(ticket) {
-    return ticket.MaVe.toUpperCase().includes(ticketQuery)
-      && ticket.MaKhachHang.toUpperCase().includes(customerQuery);
-  }
-
-  function renderTickets() {
-    const matches = tickets.filter(matchesSearch);
-    $('#ticket-count').text(matches.length + '/' + tickets.length + ' vé');
-    $ticketRows.empty();
-    if (!matches.length) {
-      emptyTickets(tickets.length ? 'Không tìm thấy vé phù hợp.' : 'Suất chiếu này chưa có vé.');
-      return;
-    }
-
-    for (const ticket of matches) {
-      const $button = $('<button>', {
-        type: 'button', class: 'btn btn-link p-0 ticket-selector', text: ticket.MaVe
-      });
-      const $row = $('<tr>', { 'data-ticket-id': ticket.MaVe }).data('ticket', ticket)
-        .append($('<td>').append($button));
-      $row.append(
-        $('<td>').text(ticket.MaKhachHang),
-        $('<td>').text(ticket.TenKhachHang),
-        $('<td>').text(seatLabel(ticket) + ' - ' + ticket.MaGhe),
-        $('<td>').text(ticket.NgayDat),
-        $('<td>').text(priceFormat.format(ticket.GiaVe)),
-        $('<td>').text(statusLabels[ticket.TrangThai] ?? ticket.TrangThai)
-      );
-      $ticketRows.append($row);
-    }
+    ticketList.setSelected(selectedTicket, ready && Boolean(show) && !loading && !saving && !moving);
   }
 
   function clearSelection() {
+    cancelTicketLookup();
     selectedTicket = null;
     selectedSeat = null;
     selectedSeats = [];
@@ -248,10 +279,67 @@
     resetCustomerPicker();
   }
 
-  function clearSearch() {
-    $search[0].reset();
-    ticketQuery = '';
-    customerQuery = '';
+  function cancelTicketLookup() {
+    const previous = ticketRequest;
+    ticketRequest = null;
+    previous?.abort();
+  }
+
+  async function loadTicket(ticket, pick = false, preserveMessage = false) {
+    const request = new AbortController();
+    cancelTicketLookup();
+    ticketRequest = request;
+    renderSelection();
+    let loaded = false;
+    try {
+      const current = await ListQuery.loadFrom(showUrl(ticket.MaSuatChieu) + '/ve/chi-tiet')({
+        maVe: ticket.MaVe, maKhachHang: ticket.MaKhachHang, maGhe: ticket.MaGhe
+      }, { signal: request.signal });
+      if (ticketRequest !== request) return;
+
+      if (moving && current.TrangThai !== 'DaDat') {
+        moving = false;
+        selectedSeat = null;
+        selectedTicket = current.MaSuatChieu === $show.val() ? current : null;
+      } else {
+        selectedTicket = current;
+      }
+      if (pick) {
+        selectedSeat = null;
+        selectedSeats = [];
+      }
+      resetCustomerPicker();
+      loaded = true;
+    } catch (error) {
+      if (ticketRequest !== request) return;
+      if (error.status === 404) {
+        const missingCurrent = !pick || (selectedTicket && Object.entries(ticketReference(ticket))
+          .every(([field, value]) => selectedTicket[field] === value));
+        if (missingCurrent) {
+          selectedTicket = null;
+          moving = false;
+          selectedSeat = null;
+          renderCustomerOptions();
+        }
+      }
+      if (!preserveMessage || error.status === 401) showError(error);
+      if (pick && error.status === 404 && show) {
+        loadShow(show.MaSuatChieu, { keepFeedback: true, refreshTickets: true });
+      }
+    } finally {
+      if (ticketRequest === request) {
+        ticketRequest = null;
+        renderSelection();
+        loadInitialCustomers();
+        if (loaded && !preserveMessage) feedbackForShow();
+      }
+    }
+  }
+
+  function selectTicket(ticket) {
+    if (saving || loading || moving || ticket.MaSuatChieu !== show?.MaSuatChieu) return;
+    showMessage('');
+    loadTicket(ticket, true);
   }
 
   function renderShowOptions() {
@@ -264,43 +352,41 @@
     }
   }
 
-  function clearShowDetails(seatMessage, ticketMessage) {
+  function clearShowDetails(seatMessage) {
     show = null;
     seats = [];
-    tickets = [];
-    $('#ticket-count').empty();
     renderSeatMap(seatMessage);
-    emptyTickets(ticketMessage);
     renderSelection();
   }
 
   function showSelectionPrompt() {
     ++showRequest;
+    cancelTicketLookup();
     loading = false;
     let message = 'Chọn phim rồi chọn suất chiếu.';
     if (!shows.length) message = 'Không có suất chiếu đang mở bán.';
     else if ($film.val()) message = 'Chọn suất chiếu để xem ghế và vé.';
-    clearShowDetails(message, message);
+    ticketList.setShow('', message);
+    clearShowDetails(message);
     showMessage('');
   }
 
-  async function loadShow(code, keepFeedback = false) {
+  async function loadShow(code, { keepFeedback = false, refreshTickets = false, recheckTicket = false } = {}) {
     const request = ++showRequest;
+    cancelTicketLookup();
     loading = true;
-    clearShowDetails('Đang tải sơ đồ ghế…', 'Đang tải vé…');
+    clearShowDetails('Đang tải sơ đồ ghế…');
+    if (refreshTickets) ticketList.refresh();
+    else ticketList.setShow(code);
     if (!keepFeedback) showMessage('');
+    if (recheckTicket && selectedTicket) loadTicket(selectedTicket, false, true);
 
     try {
-      const detail = await $.getJSON(api + '/suat-chieu/' + encodeURIComponent(code));
+      const detail = await $.getJSON(showUrl(code));
       if (request !== showRequest) return;
 
       show = detail.suatChieu;
       seats = detail.ghe;
-      tickets = detail.ve;
-      if (selectedTicket && !moving) {
-        const key = ticketKey(selectedTicket);
-        selectedTicket = tickets.find(ticket => ticketKey(ticket) === key) ?? null;
-      }
       if (selectedSeat) {
         const code = selectedSeat.MaGhe;
         selectedSeat = seats.find(seat => seat.MaGhe === code && !seat.DaCoVe) ?? null;
@@ -311,23 +397,22 @@
       }
 
       renderSeatMap();
-      renderTickets();
       if (!keepFeedback) feedbackForShow();
     } catch (xhr) {
       if (request !== showRequest) return;
       renderSeatMap('Không tải được sơ đồ ghế.');
-      emptyTickets('Không tải được vé.');
       showError(xhr);
     } finally {
       if (request === showRequest) {
         loading = false;
         renderSelection();
+        loadInitialCustomers();
       }
     }
   }
 
   async function changeTicket(method, path, payload, message) {
-    if (saving || loading || !show) return;
+    if (saving || loading || ticketRequest || !show) return;
     saving = true;
     showMessage('');
     renderSelection();
@@ -340,12 +425,13 @@
       selectedSeat = null;
       selectedSeats = [];
       resetCustomerPicker();
-      clearSearch();
       saved = true;
       showMessage(message + ' ' + selectedTicket.MaVe + '.');
-      await loadShow(selectedTicket.MaSuatChieu, true);
+      await loadShow(selectedTicket.MaSuatChieu, { keepFeedback: true, refreshTickets: true });
     } catch (xhr) {
-      if (xhr?.status === 409 || xhr?.status === 404) await loadShow($show.val(), true);
+      if (xhr?.status === 409 || xhr?.status === 404) {
+        await loadShow($show.val(), { keepFeedback: true, refreshTickets: true, recheckTicket: true });
+      }
       showError(xhr);
     } finally {
       saving = false;
@@ -355,11 +441,12 @@
   }
 
   async function sellTickets() {
-    if (saving || loading || !show?.CoTheBan || !$customer.val() || !selectedSeats.length) return;
+    if (saving || loading || ticketRequest || !show?.CoTheBan || !saleCustomer ||
+      customerPending() || !selectedSeats.length) return;
     const showCode = show.MaSuatChieu;
     const payload = {
       MaSuatChieu: showCode,
-      MaKhachHang: $customer.val(),
+      MaKhachHang: saleCustomer.MaKhachHang,
       MaGhes: selectedSeats.map(seat => seat.MaGhe)
     };
     saving = true;
@@ -375,13 +462,14 @@
       selectedSeat = null;
       selectedSeats = [];
       moving = false;
-      clearSearch();
       saved = true;
       showMessage('Đã lưu ' + savedTickets.length + ' vé: '
         + savedTickets.map(ticket => ticket.MaVe).join(', ') + '.');
-      await loadShow(showCode, true);
+      await loadShow(showCode, { keepFeedback: true, refreshTickets: true });
     } catch (xhr) {
-      if (xhr?.status === 409 || xhr?.status === 404) await loadShow(showCode, true);
+      if (xhr?.status === 409 || xhr?.status === 404) {
+        await loadShow(showCode, { keepFeedback: true, refreshTickets: true });
+      }
       showError(xhr);
     } finally {
       saving = false;
@@ -393,7 +481,6 @@
   function selectShow(code) {
     if (moving) selectedSeat = null;
     else clearSelection();
-    clearSearch();
     if (code) loadShow(code);
     else showSelectionPrompt();
   }
@@ -408,22 +495,47 @@
     if (!saving) selectShow(this.value);
   });
 
-  $customer.on('change', renderSelection);
+  $customer.on('change', () => {
+    if (selectedTicket) return;
+    const code = $customer.val();
+    saleCustomer = customers.find(customer => customer.MaKhachHang === code)
+      ?? (saleCustomer?.MaKhachHang === code ? saleCustomer : null);
+    renderCustomerOptions();
+    renderSelection();
+  });
+
+  $customerMore.on('click', () => {
+    if (!$customerMore.prop('disabled') && customerPage * customerPageSize < customerTotal) {
+      loadCustomers(customerPage + 1);
+    }
+  });
 
   $customerSearch.on('input', () => {
+    clearCustomerResults();
+    customerTimer = setTimeout(() => {
+      customerTimer = undefined;
+      loadCustomers();
+    }, 250);
     renderCustomerOptions();
     renderSelection();
   }).on('keydown', event => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
     if (event.originalEvent?.isComposing) return;
-    const matches = $customer.find('option').not('[value=""]');
-    if (matches.length === 1) $customer.val(matches[0].value).trigger('change');
-    if (matches.length) $customer.trigger('focus');
+    if (customerPending() || customerError) {
+      pickCustomerOnLoad = true;
+      if (customerTimer !== undefined || customerError) {
+        clearTimeout(customerTimer);
+        customerTimer = undefined;
+        loadCustomers();
+      }
+    } else {
+      chooseOnlyCustomer();
+    }
   });
 
   $seatMap.on('click', '.seat-button', function () {
-    if (saving || loading || !show?.CoTheBan) return;
+    if (saving || loading || ticketRequest || !show?.CoTheBan) return;
     const seat = $(this).data('seat');
     if (seat.DaCoVe) return;
     if (selectedTicket && !moving) clearSelection();
@@ -436,16 +548,7 @@
         : [...selectedSeats, seat];
     }
     renderSelection();
-    feedbackForShow();
-  });
-
-  $ticketRows.on('click', '[data-ticket-id]', function () {
-    if (saving || loading || moving) return;
-    selectedTicket = $(this).data('ticket');
-    selectedSeat = null;
-    selectedSeats = [];
-    resetCustomerPicker();
-    renderSelection();
+    loadInitialCustomers();
     feedbackForShow();
   });
 
@@ -453,7 +556,7 @@
     if (saving) return;
     clearSelection();
     if ($show.val()) {
-      loadShow($show.val());
+      loadShow($show.val(), { refreshTickets: true });
       $show.trigger('focus');
     } else {
       showSelectionPrompt();
@@ -462,7 +565,7 @@
   });
 
   $('#move-ticket').on('click', () => {
-    if (saving || loading || !show?.CoTheHuyDoi || selectedTicket?.TrangThai !== 'DaDat') return;
+    if (saving || loading || ticketRequest || !show?.CoTheHuyDoi || selectedTicket?.TrangThai !== 'DaDat') return;
     moving = true;
     selectedSeat = null;
     selectedSeats = [];
@@ -473,39 +576,20 @@
 
   $form.on('submit', event => {
     event.preventDefault();
-    if (saving || loading || !show?.CoTheBan || (selectedTicket && !moving)) return;
+    if (saving || loading || ticketRequest || !show?.CoTheBan || (selectedTicket && !moving)) return;
     if (moving) {
       if (!selectedSeat) return;
       const payload = { MaSuatChieu: show.MaSuatChieu, MaGhe: selectedSeat.MaGhe };
       changeTicket('PUT', '/doi', { ...payload, Ve: ticketReference(selectedTicket) }, 'Đã đổi vé');
-    } else if ($customer.val() && selectedSeats.length) {
+    } else if (saleCustomer && selectedSeats.length) {
       sellTickets();
     }
   });
 
   $('#cancel-ticket').on('click', () => {
-    if (saving || loading || moving || !show?.CoTheHuyDoi || selectedTicket?.TrangThai !== 'DaDat') return;
+    if (saving || loading || ticketRequest || moving || !show?.CoTheHuyDoi || selectedTicket?.TrangThai !== 'DaDat') return;
     if (!window.confirm('Hủy vé ' + selectedTicket.MaVe + '?')) return;
     changeTicket('PUT', '/huy', { Ve: ticketReference(selectedTicket) }, 'Đã hủy vé');
-  });
-
-  $search.on('submit', event => {
-    event.preventDefault();
-    ticketQuery = $('#search-ticket-id').val().trim().toUpperCase();
-    customerQuery = $('#search-customer-id').val().trim().toUpperCase();
-    if (selectedTicket && !moving && !matchesSearch(selectedTicket)) {
-      clearSelection();
-      feedbackForShow();
-    }
-    renderTickets();
-    renderSelection();
-  });
-
-  $('#clear-search').on('click', () => {
-    clearSearch();
-    renderTickets();
-    renderSelection();
-    $('#search-ticket-id').trigger('focus');
   });
 
   $('#logout-button').on('click', async () => {
@@ -523,11 +607,11 @@
   });
 
   async function initialize() {
-    emptyTickets('Đang tải suất chiếu…');
+    ticketList.setShow('', 'Đang tải suất chiếu…');
     renderSeatMap('Đang tải suất chiếu…');
     try {
-      const [user, showRows, customerRows] = await Promise.all([
-        $.getJSON('/api/auth/me'), $.getJSON(api + '/suat-chieu'), $.getJSON(api + '/khach-hang')
+      const [user, showRows] = await Promise.all([
+        $.getJSON('/api/auth/me'), $.getJSON(api + '/suat-chieu')
       ]);
       $('#account-name').text(user.HoTen + ' · ' +
         (user.VaiTro === 'QuanTriVien' ? 'Quản trị viên' : 'Nhân viên quầy'));
@@ -538,16 +622,11 @@
       for (const [code, title] of films) {
         $film.append($('<option>', { value: code, text: title }));
       }
-      customers = customerRows.map(customer => ({
-        ...customer,
-        searchText: normalizeCustomerSearch([customer.MaKhachHang, customer.TenKhachHang, customer.SoDienThoai].join(' ')),
-        phoneDigits: (customer.SoDienThoai ?? '').replace(/\D/g, '')
-      }));
       resetCustomerPicker();
       ready = true;
       showSelectionPrompt();
     } catch (xhr) {
-      emptyTickets('Không tải được dữ liệu bán vé.');
+      ticketList.setShow('', 'Không tải được dữ liệu bán vé.');
       renderSeatMap('Không tải được sơ đồ ghế.');
       showError(xhr);
     }

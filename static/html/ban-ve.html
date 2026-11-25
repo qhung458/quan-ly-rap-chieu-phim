@@ -11,6 +11,7 @@
       crossorigin="anonymous"
     />
     <link rel="stylesheet" href="../css/rap-chieu-phim.css" />
+    <link rel="stylesheet" href="../css/ve-theo-suat.css" />
     <link rel="stylesheet" href="../css/ban-ve.css" />
   </head>
   <body class="app-layout">
@@ -105,19 +106,22 @@
                 <label class="form-label" for="ticket-room">Phòng chiếu</label>
                 <input class="form-control form-control-sm" id="ticket-room" type="text" readonly />
                 <label class="form-label" for="ticket-customer-search">Tìm khách hàng</label>
-                <div>
+                <div class="ticket-customer-lookup">
                   <input
                     class="form-control form-control-sm"
                     id="ticket-customer-search"
                     type="search"
                     placeholder="Nhập mã, tên hoặc số điện thoại"
-                    maxlength="120"
+                    maxlength="100"
                     autocomplete="off"
                     aria-controls="ticket-customer"
                     aria-describedby="ticket-customer-search-status"
                     disabled
                   />
                   <small class="text-secondary" id="ticket-customer-search-status" role="status"></small>
+                  <button class="btn btn-outline-secondary btn-sm" id="ticket-customer-more" type="button" aria-controls="ticket-customer" disabled hidden>
+                    Tải thêm khách
+                  </button>
                 </div>
                 <label class="form-label" for="ticket-customer"
                   >Khách hàng</label
@@ -195,69 +199,9 @@
             </form>
         </section>
         <section class="panel ticket-list" aria-labelledby="tickets-title">
-          <div class="ticket-list-heading mb-3">
-            <div class="ticket-list-title">
-              <h2 id="tickets-title" class="mb-0">Vé của suất chiếu</h2>
-              <span
-                id="ticket-count"
-                class="text-secondary small"
-                role="status"
-              ></span>
-            </div>
-            <form id="ticket-search" class="ticket-search">
-              <input
-                class="form-control form-control-sm"
-                id="search-ticket-id"
-                type="search"
-                maxlength="15"
-                placeholder="Mã vé"
-                aria-label="Tìm theo mã vé"
-                disabled
-              />
-              <input
-                class="form-control form-control-sm"
-                id="search-customer-id"
-                type="search"
-                maxlength="10"
-                placeholder="Mã khách hàng"
-                aria-label="Tìm theo mã khách hàng"
-                disabled
-              />
-              <button class="btn btn-dark btn-sm" type="submit" disabled>
-                Tìm
-              </button>
-              <button
-                class="btn btn-outline-secondary btn-sm"
-                id="clear-search"
-                type="button"
-                disabled
-              >
-                Xóa lọc
-              </button>
-            </form>
-          </div>
-          <div class="table-responsive">
-            <table
-              class="table align-middle ticket-table mb-0"
-              aria-labelledby="tickets-title"
-            >
-              <thead>
-                <tr>
-                  <th scope="col">Mã vé</th>
-                  <th scope="col">Mã KH</th>
-                  <th scope="col">Tên khách hàng</th>
-                  <th scope="col">Ghế</th>
-                  <th scope="col">Ngày đặt</th>
-                  <th scope="col">Giá vé</th>
-                  <th scope="col">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody id="ticket-rows">
-                <tr>
-                  <td colspan="7">Cần tải jQuery để kết nối với máy chủ.</td>
-                </tr>
-              </tbody>
-            </table>
+          <h2 id="tickets-title" class="mb-3">Vé của suất chiếu</h2>
+          <div id="ticket-list-content">
+            <p class="small text-secondary">Cần tải jQuery để kết nối với máy chủ.</p>
           </div>
         </section>
       </div>
@@ -267,6 +211,8 @@
       integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
       crossorigin="anonymous"
     ></script>
+    <script src="../js/truy-van-danh-sach.js"></script>
+    <script src="../js/ve-theo-suat.js"></script>
     <script src="../js/ban-ve.js"></script>
   </body>
 </html>

@@ -39,11 +39,12 @@ Sau khi đăng nhập, chọn **Phòng chiếu và ghế** trong thanh điều h
 
 ## Bán vé
 
-Sau khi đăng nhập, mở **Bán vé**, chọn phim rồi chọn một suất còn mở bán của phim đó. Chọn khách hàng và một ghế trống rồi lưu. Nhập mã, tên (có dấu hoặc không dấu) hoặc số điện thoại vào **Tìm khách hàng** để lọc danh sách chọn. Sơ đồ lấy ghế của phòng trong MySQL. Vé đã bán có thể tra cứu theo mã vé hoặc mã khách hàng trong suất đang chọn.
+Sau khi đăng nhập, mở **Bán vé**, chọn phim rồi chọn một suất còn mở bán của phim đó. Chọn khách hàng và một ghế trống rồi lưu. Nhập mã, tên (có dấu hoặc không dấu) hoặc số điện thoại vào **Tìm khách hàng** để tra cứu theo trang. Bảng vé của suất có bộ lọc riêng theo khách, mã vé, ghế, ngày đặt và trạng thái. Sơ đồ vẫn thể hiện tình trạng của toàn bộ ghế trong phòng.
 
 - **Đổi vé** cho phép chọn ghế mới hoặc suất khác còn mở bán. Đổi ghế trong cùng suất giữ giá đã lưu. Đổi sang suất khác dùng giá của suất mới.
 - **Hủy vé** giữ bản ghi lịch sử và giải phóng ghế. Thời hạn bán, đổi và hủy lấy từ `CauHinhHeThong`, mặc định là 5 phút trước giờ chiếu để bán và 60 phút để đổi hoặc hủy.
 - Schema cần có các quy tắc trong `sqlCode/create_trigger.sql`. Danh sách chọn chỉ hiện suất `SapChieu` còn thời hạn bán. Có thể xem vé của các suất đã qua trong lịch sử mua vé ở trang **Khách hàng**.
+- Quản trị viên có thể mở **Xem vé** tại **Quản lý suất chiếu** để tra cả suất đã qua hoặc đã hủy. Excel lấy toàn bộ vé khớp từ bản chốt đang xem theo đúng thứ tự, với mã vé, mã suất, ghế, ngày đặt, giá, trạng thái và mã khách.
 
 ## Bắp nước và hóa đơn
 
@@ -74,9 +75,12 @@ Tạo một schema mới nếu cần thử toàn bộ bộ dữ liệu. Chạy t
 
 Chạy `test_function.sql` để đối chiếu T26 trên schema mới và `NormalQuery.sql` để đối chiếu T33. Nếu dùng dữ liệu mẫu từ phiên bản trước, suất `T26_DAY` có thể vẫn còn 1 ghế trống theo dữ liệu vé đã nạp. Cấu hình ứng dụng chạy cục bộ trên `127.0.0.1`. Phiên đăng nhập sẽ hết khi khởi động lại Node.js.
 
-Kiểm thử tích hợp G2 dùng kết nối MySQL cục bộ từ `.env`. Bộ kiểm thử tạo và dọn các schema thử riêng.
+Các kiểm thử tích hợp G2 và G5 dùng kết nối MySQL cục bộ từ `.env`. Bộ kiểm thử tạo và dọn các schema thử riêng.
 
 ```powershell
 $env:G2_TEST_MYSQL = '1'
 node --env-file=.env --test test/g2.integration.test.cjs
+
+$env:G5_TEST_MYSQL = '1'
+node --env-file=.env --test test/g5.integration.test.cjs
 ```
