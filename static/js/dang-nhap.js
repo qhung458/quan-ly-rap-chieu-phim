@@ -20,7 +20,7 @@
 
     $submit.prop('disabled', true);
     try {
-      const result = await $.ajax({
+      await $.ajax({
         url: '/api/auth/' + (isRegistration ? 'register' : 'login'),
         method: 'POST',
         contentType: 'application/json',
@@ -28,10 +28,11 @@
       });
       if (isRegistration) {
         this.reset();
-        $message.text(result.message);
+        window.authToast.show('Đăng ký thành công');
         $('#login-name').val(payload.TenDangNhap).trigger('focus');
       } else {
-        location.assign('khach-hang.html');
+        window.authToast.queue('Đăng nhập thành công');
+        location.assign('phim-va-suatchieu.html#phim');
       }
     } catch (xhr) {
       $message.addClass('text-danger')

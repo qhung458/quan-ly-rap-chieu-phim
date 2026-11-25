@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
     <link rel="stylesheet" href="../css/rap-chieu-phim.css">
     <link rel="stylesheet" href="../css/phim-va-suatchieu.css">
+    <script defer src="../js/auth-toast.js"></script>
+    <script defer src="../js/xuat-excel.js"></script>
     <script defer src="../js/phim-va-suat-chieu.js"></script>
   </head>
   <body class="app-layout">
@@ -36,9 +38,13 @@
         <p class="page-description">Tra cứu và cập nhật thông tin phim.</p>
         <div class="catalog-layout">
           <section class="panel" aria-labelledby="phim-list">
-            <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
               <h2 id="phim-list" class="mb-0">Danh sách phim</h2>
-              <span class="small text-secondary" data-count role="status"></span>
+              <div class="ms-auto d-flex flex-column align-items-end gap-1 text-end">
+                <span class="small text-secondary" data-count role="status"></span>
+                <button type="button" class="btn btn-outline-dark btn-sm" id="phim-export" disabled>Xuất Excel</button>
+                <span class="small d-block" id="phim-export-message" role="status"></span>
+              </div>
             </div>
             <div class="catalog-filters mb-3">
               <div><label class="form-label" for="movie-search">Mã hoặc tên phim</label><input class="form-control" id="movie-search" type="search"></div>
@@ -85,9 +91,13 @@
         <p class="page-description">Tra cứu và xếp lịch chiếu theo phim và phòng.</p>
         <div class="catalog-layout">
           <section class="panel" aria-labelledby="suat-chieu-list">
-            <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
               <h2 id="suat-chieu-list" class="mb-0">Danh sách suất chiếu</h2>
-              <span class="small text-secondary" data-count role="status"></span>
+              <div class="ms-auto d-flex flex-column align-items-end gap-1 text-end">
+                <span class="small text-secondary" data-count role="status"></span>
+                <button type="button" class="btn btn-outline-dark btn-sm" id="suat-chieu-export" disabled>Xuất Excel</button>
+                <span class="small d-block" id="suat-chieu-export-message" role="status"></span>
+              </div>
             </div>
             <div class="catalog-filters mb-3">
               <div><label class="form-label" for="movie-filter">Phim</label><select class="form-select" id="movie-filter"><option value="">Tất cả phim</option></select></div>

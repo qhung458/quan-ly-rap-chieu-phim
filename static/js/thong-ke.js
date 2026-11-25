@@ -11,6 +11,31 @@
   let mode = 'day';
   let version = 0;
 
+  const enableStatsExport = ExcelExport.bind('stats-export', () => {
+    const byDay = mode === 'day';
+    const periodRows = byDay ? data.TheoNgay : data.TheoThang;
+    const totals = row => [row.SoVe, row.DoanhThuVe, row.SoHoaDon, row.DoanhThuBapNuoc, row.TongDoanhThu];
+    const metrics = [['Vé', 12, ExcelExport.integer], ['Doanh thu vé', 20, ExcelExport.money],
+      ['Hóa đơn', 12, ExcelExport.integer], ['Doanh thu bắp nước', 23, ExcelExport.money],
+      ['Tổng doanh thu', 20, ExcelExport.money]];
+    return {
+      filename: 'thong-ke-' + data.TuNgay + '_' + data.DenNgay,
+      sheets: [
+        { name: 'Tổng quan', columns: [['Từ ngày', 16, ExcelExport.date], ['Đến ngày', 16, ExcelExport.date], ...metrics],
+          rows: [[ExcelExport.asDate(data.TuNgay), ExcelExport.asDate(data.DenNgay), ...totals(data.TongQuan)]] },
+        { name: byDay ? 'Theo ngày' : 'Theo tháng',
+          columns: [[byDay ? 'Ngày' : 'Tháng', 16, byDay ? ExcelExport.date : ExcelExport.month], ...metrics],
+          rows: periodRows.map(row => [ExcelExport.asDate(byDay ? row.Ngay : row.Thang), ...totals(row)]) },
+        { name: 'Theo phim', columns: [['Mã phim', 16], ['Phim', 38], ['Vé', 12, ExcelExport.integer],
+          ['Doanh thu', 20, ExcelExport.money]],
+          rows: data.TheoPhim.map(row => [row.MaPhim, row.TenPhim, row.SoVe, row.DoanhThu]) },
+        { name: 'Theo combo', columns: [['Mã combo', 16], ['Combo', 38], ['Số lượng', 12, ExcelExport.integer],
+          ['Doanh thu', 20, ExcelExport.money]],
+          rows: data.TheoCombo.map(row => [row.MaCombo, row.TenCombo, row.SoLuong, row.DoanhThu]) }
+      ]
+    };
+  });
+
   const dateText = date => {
     const pad = number => String(number).padStart(2, '0');
     return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
@@ -96,20 +121,31 @@
 
   async function load() {
     const current = ++version;
+    enableStatsExport(false);
     $message.removeClass('text-danger').empty();
     const from = $('#stats-from').val();
     const to = $('#stats-to').val();
     if (!from || !to || from > to) {
+      $submit.prop('disabled', false);
       $message.addClass('text-danger').text('Chọn khoảng ngày hợp lệ: từ ngày không được sau đến ngày.');
       return;
     }
 
     $submit.prop('disabled', true);
+    $message.text('Đang tải thống kê…');
     try {
-      const result = await $.getJSON('/api/thong-ke', { tuNgay: from, denNgay: to });
+      const result = await $.ajax({
+        url: '/api/thong-ke',
+        data: { tuNgay: from, denNgay: to },
+        dataType: 'json',
+        cache: false
+      });
       if (current !== version) return;
       data = result;
       render();
+      enableStatsExport(true);
+      const formatDate = date => date.split('-').reverse().join('/');
+      $message.text('Đang hiển thị từ ' + formatDate(result.TuNgay) + ' đến ' + formatDate(result.DenNgay) + '.');
     } catch (xhr) {
       if (current !== version) return;
       showError(xhr);
@@ -131,6 +167,7 @@
     event.preventDefault();
     load();
   });
+  $('#stats-from, #stats-to').on('change', load);
   $('#by-day').on('click', () => setMode('day'));
   $('#by-month').on('click', () => setMode('month'));
   $('#logout-button').on('click', async () => {

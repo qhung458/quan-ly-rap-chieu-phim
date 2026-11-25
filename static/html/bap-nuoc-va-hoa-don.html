@@ -54,8 +54,12 @@
             </form>
           </section>
           <section class="panel" aria-labelledby="combos-title">
-            <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
               <h2 id="combos-title" class="mb-0">Danh mục combo</h2>
+              <div class="text-end">
+                <button type="button" class="btn btn-outline-dark btn-sm" id="combo-export" disabled>Xuất Excel</button>
+                <span class="small d-block" id="combo-export-message" role="status"></span>
+              </div>
               <span id="combo-count" class="text-secondary small" role="status"></span>
             </div>
             <label class="visually-hidden" for="combo-search">Tìm combo</label>
@@ -103,8 +107,12 @@
             </section>
           </div>
           <section class="panel" aria-labelledby="invoices-title">
-            <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
               <h2 id="invoices-title" class="mb-0">Danh sách hóa đơn</h2>
+              <div class="text-end">
+                <button type="button" class="btn btn-outline-dark btn-sm" id="invoice-export" disabled>Xuất Excel</button>
+                <span class="small d-block" id="invoice-export-message" role="status"></span>
+              </div>
               <span id="invoice-count" class="text-secondary small" role="status"></span>
             </div>
             <div class="invoice-filter">
@@ -130,6 +138,7 @@
       </div>
     </main>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="../js/xuat-excel.js"></script>
     <script src="../js/bap-nuoc-va-hoa-don.js"></script>
   </body>
 </html>

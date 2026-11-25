@@ -67,6 +67,9 @@ app.get([
   if (!req.session.user) return res.redirect('/html/dang-nhap.html');
   next();
 });
+app.get('/js/vendor/exceljs.js', (_req, res) => {
+  res.sendFile(require.resolve('exceljs/dist/exceljs.min.js'));
+});
 app.use(express.static(staticDirectory));
 
 app.use((error, _req, res, next) => {
