@@ -4,11 +4,11 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const { sql, withSchema, withApplication, json, signIn, signUp } = require('./fixtures/mysql-app.cjs');
 
-const skip = process.env.G6_TEST_MYSQL !== '1' && 'Run with G6_TEST_MYSQL=1 for disposable schemas on the local MySQL server.';
+const skip = process.env.MYSQL_INTEGRATION_TESTS !== '1' && 'Run with MYSQL_INTEGRATION_TESTS=1 for disposable schemas on the local MySQL server.';
 const roomsPath = '/api/phong-chieu';
 const seatsPath = code => roomsPath + '/' + code + '/ghe';
-const staff = 'g6_staff';
-const manager = 'g6_manager';
+const staff = 'room_staff';
+const manager = 'room_manager';
 const roomCodes = items => items.map(item => item.MaPhong);
 const seatCodes = items => items.map(item => item.MaGhe);
 
@@ -42,7 +42,7 @@ async function seed(db) {
   await db.query('INSERT INTO Ghe (MaGhe, MaPhong, SoHang, SoGhe, LoaiGhe) VALUES ?', [[...special, ...remainder]]);
 }
 
-test('G6 lists preserve actual capacity, room scope and physical seat order on MySQL', { skip }, async t => {
+test('Room and seat lists preserve actual capacity, room scope and physical seat order on MySQL', { skip }, async t => {
   await withSchema(async (db, schema) => {
     await seed(db);
     await withApplication(schema, async request => {

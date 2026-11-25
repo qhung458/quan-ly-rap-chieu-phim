@@ -2,11 +2,9 @@
   margin-bottom: 1.5rem;
 }
 
-.stats-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: end;
+.stats-period-fields {
+  flex: 0 1 26rem;
+  width: 100%;
 }
 
 .stat-tiles {
@@ -65,6 +63,22 @@
 .stats-scroll {
   max-height: 32rem;
   overflow: auto;
+}
+
+.stats-ranking {
+  min-width: 0;
+}
+
+.stats-rank-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.stats-rank-pagination[hidden] {
+  display: none;
 }
 
 .bar-cell {

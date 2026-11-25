@@ -128,7 +128,7 @@ function exceeds(from, to, type) {
   return from > to;
 }
 
-function orderBy(raw, options) {
+function listOrder(raw, options) {
   const input = scalar(raw, 'sort', 150) || options.defaultSort;
   const fields = input.split(',');
   if (fields.length > 2) throw new ListQueryError('sort');
@@ -148,7 +148,7 @@ function orderBy(raw, options) {
   for (const column of options.tieBreakers) {
     if (!order.has(column)) order.set(column, 'ASC');
   }
-  return Array.from(order, ([column, direction]) => `${column} ${direction}`).join(', ');
+  return order;
 }
 
 // SQL expressions in the options are supplied by the route. Text columns use
@@ -196,7 +196,9 @@ function parseListQuery(query, options) {
       throw new ListQueryError(`${from}/${to}`);
     }
   }
-  return { filters: parsedFilters, conditions, params, orderBy: orderBy(query.sort, options) };
+  const order = listOrder(query.sort, options);
+  const orderBy = Array.from(order, ([column, direction]) => `${column} ${direction}`).join(', ');
+  return { filters: parsedFilters, conditions, params, terms, order, orderBy };
 }
 
 function parseListPagination(page, pageSize) {

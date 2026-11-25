@@ -55,52 +55,88 @@
           </section>
           <section class="panel" aria-labelledby="combos-title">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
-              <h2 id="combos-title" class="mb-0">Danh mục combo</h2>
+              <div>
+                <h2 id="combos-title" class="mb-0">Danh mục combo</h2>
+                <span id="combo-count" class="small text-secondary" role="status"></span>
+              </div>
               <div class="text-end">
                 <button type="button" class="btn btn-outline-dark btn-sm" id="combo-export" disabled>Xuất Excel</button>
                 <span class="small d-block" id="combo-export-message" role="status"></span>
               </div>
-              <span id="combo-count" class="text-secondary small" role="status"></span>
             </div>
-            <form id="combo-query" class="list-query mb-3">
-              <fieldset disabled>
-                <label class="form-label" for="combo-search">Tìm combo</label>
-                <input class="form-control" type="search" id="combo-search" name="q" maxlength="100" placeholder="Mã, tên hoặc mô tả combo">
-                <details class="query-details">
-                  <summary>Tìm nâng cao và bộ lọc</summary>
-                  <div class="query-grid">
-                    <label>Mã combo chính xác<input class="form-control" name="maCombo" maxlength="10"></label>
-                    <label>Tên combo<input class="form-control" name="ten" maxlength="100"></label>
-                    <label>Mô tả<input class="form-control" name="moTa" maxlength="255"></label>
-                    <label>Giá từ (₫)<input class="form-control" name="giaMin" type="number" min="0" step="0.01"></label>
-                    <label>Giá đến (₫)<input class="form-control" name="giaMax" type="number" min="0" step="0.01"></label>
-                    <label>Đã bán từ<input class="form-control" name="daBanMin" type="number" min="0" step="1"></label>
-                    <label>Đã bán đến<input class="form-control" name="daBanMax" type="number" min="0" step="1"></label>
+            <form id="combo-query" class="query-toolbar mb-3">
+              <fieldset class="query-layout" disabled>
+                <div class="query-head">
+                  <label class="query-keyword" for="combo-search">Tìm combo
+                    <input class="form-control form-control-sm" type="search" id="combo-search" name="q" maxlength="100" placeholder="Mã, tên hoặc mô tả combo">
+                  </label>
+                  <div class="query-actions">
+                    <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
                   </div>
-                </details>
-                <details class="query-details">
-                  <summary>Sắp xếp</summary>
-                  <div class="query-grid">
-                    <label>Tiêu chí chính
-                      <select class="form-select" data-sort-main>
-                        <option value="maCombo">Mã combo</option>
-                        <option value="ten">Tên combo</option>
-                        <option value="gia">Giá</option>
-                        <option value="daBan">Đã bán</option>
-                      </select>
-                    </label>
-                    <label>Thứ tự chính<select class="form-select" data-sort-main-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
-                    <label>Tiêu chí phụ<select class="form-select" data-sort-extra><option value="">Không dùng</option></select></label>
-                    <label>Thứ tự phụ<select class="form-select" data-sort-extra-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
-                  </div>
-                </details>
-                <div class="query-actions">
-                  <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
-                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
-                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
                 </div>
+                <div class="query-options">
+                  <details class="query-section">
+                    <summary>Tìm nâng cao và lọc</summary>
+                    <div class="query-section-body">
+                      <fieldset class="query-group">
+                        <legend>Thông tin combo</legend>
+                        <div class="query-fields">
+                          <label>Mã combo chính xác<input class="form-control form-control-sm" name="maCombo" maxlength="10"></label>
+                          <label>Tên combo<input class="form-control form-control-sm" name="ten" maxlength="100"></label>
+                          <label>Mô tả<input class="form-control form-control-sm" name="moTa" maxlength="255"></label>
+                        </div>
+                      </fieldset>
+                      <div class="query-groups query-groups--paired">
+                        <fieldset class="query-group">
+                          <legend>Khoảng giá (₫)</legend>
+                          <div class="query-fields query-fields--pair">
+                            <label>Từ<input class="form-control form-control-sm" name="giaMin" type="number" min="0" step="0.01"></label>
+                            <label>Đến<input class="form-control form-control-sm" name="giaMax" type="number" min="0" step="0.01"></label>
+                          </div>
+                        </fieldset>
+                        <fieldset class="query-group">
+                          <legend>Số phần đã bán</legend>
+                          <div class="query-fields query-fields--pair">
+                            <label>Từ<input class="form-control form-control-sm" name="daBanMin" type="number" min="0" step="1"></label>
+                            <label>Đến<input class="form-control form-control-sm" name="daBanMax" type="number" min="0" step="1"></label>
+                          </div>
+                        </fieldset>
+                      </div>
+                    </div>
+                  </details>
+                  <details class="query-section">
+                    <summary>Sắp xếp</summary>
+                    <div class="query-section-body">
+                      <div class="query-groups query-groups--paired">
+                        <fieldset class="query-group">
+                          <legend>Sắp xếp chính</legend>
+                          <div class="query-fields query-fields--pair">
+                            <label>Tiêu chí
+                              <select class="form-select form-select-sm" data-sort-main>
+                                <option value="maCombo">Mã combo</option>
+                                <option value="ten">Tên combo</option>
+                                <option value="gia">Giá</option>
+                                <option value="daBan">Đã bán</option>
+                              </select>
+                            </label>
+                            <label>Thứ tự<select class="form-select form-select-sm" data-sort-main-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                          </div>
+                        </fieldset>
+                        <fieldset class="query-group">
+                          <legend>Sắp xếp phụ</legend>
+                          <div class="query-fields query-fields--pair">
+                            <label>Tiêu chí<select class="form-select form-select-sm" data-sort-extra><option value="">Không dùng</option></select></label>
+                            <label>Thứ tự<select class="form-select form-select-sm" data-sort-extra-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                          </div>
+                        </fieldset>
+                      </div>
+                    </div>
+                  </details>
+                </div>
+                <ul class="query-chips" data-query-conditions aria-label="Điều kiện đang áp dụng" hidden></ul>
               </fieldset>
-              <ul class="query-conditions" data-query-conditions aria-label="Điều kiện đang áp dụng" hidden></ul>
             </form>
             <div class="table-responsive">
               <table class="table align-middle customer-table mb-0" aria-labelledby="combos-title">
@@ -122,14 +158,21 @@
             <section class="panel" aria-labelledby="invoice-new-title">
               <h2 id="invoice-new-title">Lập hóa đơn</h2>
               <form id="invoice-form" class="form-stack" novalidate>
-                <label class="form-label" for="customer-search">Tìm khách hàng</label>
-                <input class="form-control" id="customer-search" type="search" placeholder="Mã, tên hoặc số điện thoại" disabled>
-                <label class="form-label" for="invoice-customer">Khách hàng</label>
-                <select class="form-select" id="invoice-customer" required disabled></select>
-                <div class="customer-lookup-status mb-3">
-                  <span id="customer-lookup-message" class="small text-secondary" role="status"></span>
-                  <button class="btn btn-outline-secondary btn-sm" id="customer-more" type="button" hidden>Tải thêm khách</button>
-                </div>
+                <fieldset class="query-toolbar query-group invoice-customer-lookup mb-3">
+                  <legend>Khách hàng</legend>
+                  <div class="query-fields">
+                    <label for="customer-search">Tìm khách hàng
+                      <input class="form-control form-control-sm" id="customer-search" type="search" placeholder="Mã, tên hoặc số điện thoại" disabled>
+                    </label>
+                    <label for="invoice-customer">Chọn khách hàng
+                      <select class="form-select form-select-sm" id="invoice-customer" required disabled></select>
+                    </label>
+                  </div>
+                  <div class="customer-lookup-status mt-2">
+                    <span id="customer-lookup-message" class="small text-secondary" role="status"></span>
+                    <button class="btn btn-outline-secondary btn-sm" id="customer-more" type="button" hidden>Tải thêm khách</button>
+                  </div>
+                </fieldset>
                 <div class="d-flex justify-content-between align-items-center mb-2">
                   <span class="form-label mb-0">Combo</span>
                   <button class="btn btn-outline-dark btn-sm" id="add-line" type="button" disabled>Thêm dòng</button>
@@ -150,58 +193,102 @@
           </div>
           <section class="panel" aria-labelledby="invoices-title">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
-              <h2 id="invoices-title" class="mb-0">Danh sách hóa đơn</h2>
+              <div>
+                <h2 id="invoices-title" class="mb-0">Danh sách hóa đơn</h2>
+                <span id="invoice-count" class="small text-secondary" role="status"></span>
+              </div>
               <div class="text-end">
                 <button type="button" class="btn btn-outline-dark btn-sm" id="invoice-export" disabled>Xuất Excel</button>
                 <span class="small d-block" id="invoice-export-message" role="status"></span>
               </div>
-              <span id="invoice-count" class="text-secondary small" role="status"></span>
             </div>
-            <form id="invoice-query" class="list-query mb-3">
-              <fieldset disabled>
-                <div class="query-grid invoice-search-grid">
-                  <label>Tìm hóa đơn<input class="form-control" type="search" id="invoice-search" name="q" maxlength="100" placeholder="Mã hóa đơn, mã, tên hoặc SĐT khách"></label>
-                  <label>Từ ngày mua<input class="form-control" type="date" id="invoice-from" name="tuNgay"></label>
-                  <label>Đến ngày mua<input class="form-control" type="date" id="invoice-to" name="denNgay"></label>
-                </div>
-                <details class="query-details">
-                  <summary>Tìm nâng cao và bộ lọc</summary>
-                  <div class="query-grid">
-                    <label>Mã hóa đơn chính xác<input class="form-control" name="maHoaDon" maxlength="15"></label>
-                    <label>Mã khách chính xác<input class="form-control" name="maKhachHang" maxlength="10"></label>
-                    <label>Tên khách<input class="form-control" name="tenKhachHang" maxlength="100"></label>
-                    <label>SĐT chính xác<input class="form-control" name="soDienThoai" type="tel" maxlength="30"></label>
-                    <label>Tổng tiền từ (₫)<input class="form-control" name="tongMin" type="number" min="0" step="0.01"></label>
-                    <label>Tổng tiền đến (₫)<input class="form-control" name="tongMax" type="number" min="0" step="0.01"></label>
-                    <label class="query-wide">Hóa đơn có ít nhất một combo đã chọn
-                      <select class="form-select" id="invoice-combo-filter" name="maCombo" size="4" multiple></select>
-                      <small class="text-secondary">Giữ Ctrl hoặc ⌘ để chọn nhiều combo.</small>
-                    </label>
+            <form id="invoice-query" class="query-toolbar mb-3">
+              <fieldset class="query-layout" disabled>
+                <div class="query-head">
+                  <label class="query-keyword" for="invoice-search">Tìm hóa đơn
+                    <input class="form-control form-control-sm" type="search" id="invoice-search" name="q" maxlength="100" placeholder="Mã hóa đơn, mã, tên hoặc SĐT khách">
+                  </label>
+                  <div class="query-actions">
+                    <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
                   </div>
-                </details>
-                <details class="query-details">
-                  <summary>Sắp xếp</summary>
-                  <div class="query-grid">
-                    <label>Tiêu chí chính
-                      <select class="form-select" data-sort-main>
-                        <option value="ngayMua">Ngày mua</option>
-                        <option value="maHoaDon">Mã hóa đơn</option>
-                        <option value="tongTien">Tổng tiền</option>
-                        <option value="soLuong">Tổng số phần</option>
-                      </select>
-                    </label>
-                    <label>Thứ tự chính<select class="form-select" data-sort-main-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
-                    <label>Tiêu chí phụ<select class="form-select" data-sort-extra><option value="">Không dùng</option></select></label>
-                    <label>Thứ tự phụ<select class="form-select" data-sort-extra-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
-                  </div>
-                </details>
-                <div class="query-actions">
-                  <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
-                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
-                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
                 </div>
+                <fieldset class="query-group">
+                  <legend>Ngày mua</legend>
+                  <div class="query-fields query-fields--pair">
+                    <label>Từ ngày<input class="form-control form-control-sm" type="date" id="invoice-from" name="tuNgay"></label>
+                    <label>Đến ngày<input class="form-control form-control-sm" type="date" id="invoice-to" name="denNgay"></label>
+                  </div>
+                </fieldset>
+                <div class="query-options">
+                  <details class="query-section">
+                    <summary>Tìm nâng cao và lọc</summary>
+                    <div class="query-section-body">
+                      <fieldset class="query-group">
+                        <legend>Khách hàng</legend>
+                        <div class="query-fields">
+                          <label>Mã khách chính xác<input class="form-control form-control-sm" name="maKhachHang" maxlength="10"></label>
+                          <label>Tên khách<input class="form-control form-control-sm" name="tenKhachHang" maxlength="100"></label>
+                          <label>SĐT chính xác<input class="form-control form-control-sm" name="soDienThoai" type="tel" maxlength="30"></label>
+                        </div>
+                      </fieldset>
+                      <div class="query-groups query-groups--paired">
+                        <fieldset class="query-group">
+                          <legend>Hóa đơn và tổng tiền</legend>
+                          <div class="query-fields">
+                            <label>Mã hóa đơn chính xác<input class="form-control form-control-sm" name="maHoaDon" maxlength="15"></label>
+                          </div>
+                          <div class="query-fields query-fields--pair mt-2">
+                            <label>Từ (₫)<input class="form-control form-control-sm" name="tongMin" type="number" min="0" step="0.01"></label>
+                            <label>Đến (₫)<input class="form-control form-control-sm" name="tongMax" type="number" min="0" step="0.01"></label>
+                          </div>
+                        </fieldset>
+                        <fieldset class="query-group">
+                          <legend>Combo đã mua</legend>
+                          <div class="query-fields">
+                            <div>
+                              <label class="d-block">Có ít nhất một combo đã chọn
+                                <select class="form-select form-select-sm" id="invoice-combo-filter" name="maCombo" size="4" multiple aria-describedby="invoice-combo-filter-help"></select>
+                              </label>
+                              <small class="text-secondary d-block mt-1" id="invoice-combo-filter-help">Giữ Ctrl hoặc ⌘ để chọn nhiều combo.</small>
+                            </div>
+                          </div>
+                        </fieldset>
+                      </div>
+                    </div>
+                  </details>
+                  <details class="query-section">
+                    <summary>Sắp xếp</summary>
+                    <div class="query-section-body">
+                      <div class="query-groups query-groups--paired">
+                        <fieldset class="query-group">
+                          <legend>Sắp xếp chính</legend>
+                          <div class="query-fields query-fields--pair">
+                            <label>Tiêu chí
+                              <select class="form-select form-select-sm" data-sort-main>
+                                <option value="ngayMua">Ngày mua</option>
+                                <option value="maHoaDon">Mã hóa đơn</option>
+                                <option value="tongTien">Tổng tiền</option>
+                                <option value="soLuong">Tổng số phần</option>
+                              </select>
+                            </label>
+                            <label>Thứ tự<select class="form-select form-select-sm" data-sort-main-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                          </div>
+                        </fieldset>
+                        <fieldset class="query-group">
+                          <legend>Sắp xếp phụ</legend>
+                          <div class="query-fields query-fields--pair">
+                            <label>Tiêu chí<select class="form-select form-select-sm" data-sort-extra><option value="">Không dùng</option></select></label>
+                            <label>Thứ tự<select class="form-select form-select-sm" data-sort-extra-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                          </div>
+                        </fieldset>
+                      </div>
+                    </div>
+                  </details>
+                </div>
+                <ul class="query-chips" data-query-conditions aria-label="Điều kiện đang áp dụng" hidden></ul>
               </fieldset>
-              <ul class="query-conditions" data-query-conditions aria-label="Điều kiện đang áp dụng" hidden></ul>
             </form>
             <div class="table-responsive">
               <table class="table align-middle customer-table mb-0" aria-labelledby="invoices-title">

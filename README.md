@@ -1,18 +1,46 @@
 # Chạy ứng dụng quản lý rạp chiếu phim
 
-Dùng Node.js 24 và MySQL 8.0. Mở PowerShell tại thư mục `quanLyRapChieuPhim`.
+Dùng Node.js 24 và MySQL từ 8.0.16. Chạy các lệnh PowerShell tại thư mục gốc của repository.
 
-1. Trong MySQL Workbench, chọn schema đồ án đã có các bảng và dữ liệu mẫu. Chạy `sqlCode/create_tai_khoan.sql` trên schema đó để thêm bảng tài khoản. Với schema đã tạo trước G2, dừng ứng dụng rồi chạy toàn bộ `sqlCode/migrate_G2.sql` trên schema đã chọn trước khi dùng phiên bản này.
-2. Chạy `npm ci` để cài đúng phiên bản thư viện trong `package-lock.json`.
-3. Tạo `.env` từ `.env.example` nếu máy anh chưa có file này.
+## Chuẩn bị cơ sở dữ liệu
+
+Trong MySQL Workbench, chọn schema sẽ dùng cho `DB_NAME` và chạy toàn bộ từng file trong `sqlCode/` theo thứ tự dưới đây.
+
+### Tạo schema mới
+
+Tạo một schema trống và chọn schema đó trước khi chạy các file. Ví dụ:
+
+```sql
+CREATE DATABASE quan_ly_rap_chieu_phim CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+USE quan_ly_rap_chieu_phim;
+```
+
+1. `createTable.sql` tạo các bảng nghiệp vụ, khóa ngoại và dãy mã hóa đơn.
+2. `addSample.sql` nạp dữ liệu mẫu nếu cần. Chạy bước này trước khi cài trigger để nạp được lịch chiếu và vé lịch sử.
+3. `create_trigger.sql` tạo cấu hình thời hạn bán, đổi, hủy vé và các trigger kiểm tra vé, ghế, lịch chiếu.
+4. `create_tai_khoan.sql` tạo bảng tài khoản để đăng ký và đăng nhập.
+5. `create_procedure.sql` tạo thủ tục tìm suất chiếu theo phim và ngày.
+6. `create_function.sql` tạo hàm đếm số ghế trống. Hai bước cuối cần khi sử dụng thủ tục và hàm trực tiếp trong SQL.
+
+### Nâng cấp schema đã có dữ liệu
+
+1. Dừng ứng dụng và chọn đúng schema đang dùng. Với cơ sở dữ liệu cũ còn lưu hóa đơn theo từng dòng trong `HoaDon`, chạy `migrate_invoice_headers.sql` nếu phần đầu hóa đơn hoặc dãy mã chưa được cài. Script lấy ngày chứng từ từ dòng mua sớm nhất, tạo một đầu chứng từ cho mỗi mã và giữ nguyên các dòng hóa đơn.
+2. Cài các thành phần còn thiếu theo thứ tự. Chạy `create_trigger.sql` cho cấu hình và quy tắc bán vé, rồi `create_tai_khoan.sql` nếu chưa có bảng tài khoản. Việc bổ sung thủ tục và hàm SQL theo bước 5–6 ở trên.
+
+Các file `createTable.sql` và `addSample.sql` dành cho khởi tạo schema mới.
+
+## Khởi động ứng dụng
+
+1. Chạy `npm ci` để cài đúng phiên bản thư viện trong `package-lock.json`.
+2. Tạo `.env` từ `.env.example` nếu chưa có.
 
    ```powershell
    Copy-Item .env.example .env
    node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
    ```
 
-4. Điền `DB_NAME`, `DB_USER`, `DB_PASSWORD` theo kết nối Workbench. Dán chuỗi ngẫu nhiên vào `SESSION_SECRET`. Dùng dấu nháy kép quanh mật khẩu nếu chứa dấu `#` hoặc khoảng trắng. Giữ `.env` ở máy anh.
-5. Chạy `npm start`, rồi mở [trang đăng nhập](http://127.0.0.1:3000). Giao diện tải Bootstrap và jQuery qua CDN. Mở [trang kiểm tra kết nối](http://127.0.0.1:3000/api/health) để xác nhận API trả `{"ok":true}`.
+3. Điền `DB_NAME`, `DB_USER`, `DB_PASSWORD` theo kết nối Workbench. Dán chuỗi ngẫu nhiên vào `SESSION_SECRET`. Dùng dấu nháy kép quanh mật khẩu nếu chứa dấu `#` hoặc khoảng trắng.
+4. Chạy `npm start`, rồi mở [trang đăng nhập](http://127.0.0.1:3000). Giao diện tải Bootstrap và jQuery qua CDN. Mở [trang kiểm tra kết nối](http://127.0.0.1:3000/api/health) để xác nhận API trả `{"ok":true}`. Phiên đăng nhập sẽ hết khi khởi động lại Node.js.
 
 ## Tài khoản demo
 
@@ -55,37 +83,36 @@ Mở **Bắp nước và hóa đơn** trong thanh điều hướng. Nhân viên 
 - Bảng `DauHoaDon` lưu một khách cho mỗi mã hóa đơn. Bảng `HoaDon` lưu từng dòng combo và có khóa ngoại theo mã hóa đơn và mã khách. Mã hóa đơn tự tăng theo dạng `HD001`, `HD002`, … và ứng dụng giữ số đã cấp khi hóa đơn bị xóa.
 - Máy chủ tự tính `TongTien` = giá combo trong MySQL × số lượng. Đổi giá combo sau đó không làm thay đổi hóa đơn cũ.
 - Combo đã có trong hóa đơn không thể xóa (khóa ngoại). Hóa đơn nhập trùng combo được gộp số lượng.
-- Ngày chứng từ của hóa đơn trước G2 lấy theo dòng có thời điểm mua sớm nhất. Danh sách hóa đơn phân trang. Excel Combo và Hóa đơn lấy đủ các bản ghi khớp theo đúng dữ liệu và thứ tự của lần áp dụng truy vấn đang xem.
+- Khi chuyển dữ liệu hóa đơn cũ sang đầu chứng từ, ngày chứng từ lấy theo dòng có thời điểm mua sớm nhất. Danh sách hóa đơn phân trang. Excel Combo và Hóa đơn lấy đủ các bản ghi khớp theo đúng dữ liệu và thứ tự của lần áp dụng truy vấn đang xem.
 
 ## Thống kê
 
 Mở **Thống kê**, chọn khoảng ngày (tối đa 366 ngày, mặc định 30 ngày gần nhất). Trang hiển thị tổng doanh thu vé và bắp nước, doanh thu theo ngày hoặc tháng, theo phim và theo combo.
 
+- Hai bảng phim và combo có điều kiện tìm kiếm, ngưỡng số lượng và doanh thu, thứ tự sắp xếp và trang riêng. Bấm **Xem thống kê** để tải lại số liệu của kỳ.
+- Excel gồm bốn sheet **Tổng quan**, **Theo ngày** hoặc **Theo tháng**, **Theo phim** và **Theo combo**. Hai sheet xếp hạng lấy đủ các dòng khớp theo điều kiện và thứ tự đang áp dụng, kể cả khi đang xem trang sau.
 - Doanh thu vé tính theo ngày chiếu, loại vé đã hủy và suất bị hủy (cùng quy ước với `NormalQuery.sql`). Toàn bộ doanh thu bắp nước của một hóa đơn thuộc ngày chứng từ của hóa đơn đó.
 
-## Dựng schema mới để thử
+## Kiểm thử
 
-Tạo một schema mới nếu cần thử toàn bộ bộ dữ liệu. Chạy theo thứ tự:
+### Kiểm tra bằng SQL
 
-1. `createTable.sql`
-2. `addSample.sql`
-3. `seed_T26.sql`
-4. `create_trigger.sql`
-5. `create_procedure.sql`
-6. `create_function.sql`
-7. `create_tai_khoan.sql`
+Trên schema thử đã được khởi tạo đầy đủ và nạp dữ liệu mẫu, chạy theo thứ tự sau.
 
-Chạy `test_function.sql` để đối chiếu T26 trên schema mới và `NormalQuery.sql` để đối chiếu T33. Nếu dùng dữ liệu mẫu từ phiên bản trước, suất `T26_DAY` có thể vẫn còn 1 ghế trống theo dữ liệu vé đã nạp. Cấu hình ứng dụng chạy cục bộ trên `127.0.0.1`. Phiên đăng nhập sẽ hết khi khởi động lại Node.js.
+1. `seed_T26.sql` nạp thêm dữ liệu kiểm thử ghế và suất chiếu. Chạy một lần trên schema thử.
+2. `test_function.sql` đối chiếu số ghế trống.
+3. `test_rules.sql` kiểm tra các quy tắc bán vé, đổi vé và lịch chiếu. Script tạo thủ tục kiểm tra tạm và hoàn tác các giao dịch thử.
 
-Các kiểm thử tích hợp G2, G5 và G6 dùng kết nối MySQL cục bộ từ `.env`. Bộ kiểm thử tạo và dọn các schema thử riêng.
+Có thể chạy `kiemTraDuLieu.sql` để rà dữ liệu hoặc `NormalQuery.sql` để đối chiếu doanh thu vé theo ngày chiếu.
+
+### Kiểm thử ứng dụng
+
+`npm test` chạy kiểm thử mặc định. Để chạy cả kiểm thử tích hợp, bật cờ dưới đây. Bộ kiểm thử dùng kết nối MySQL cục bộ trong `.env` và tự tạo, dọn các schema thử riêng.
 
 ```powershell
-$env:G2_TEST_MYSQL = '1'
-node --env-file=.env --test test/g2.integration.test.cjs
-
-$env:G5_TEST_MYSQL = '1'
-node --env-file=.env --test test/g5.integration.test.cjs
-
-$env:G6_TEST_MYSQL = '1'
-node --env-file=.env --test test/g6.integration.test.cjs
+$env:MYSQL_INTEGRATION_TESTS = '1'
+node --env-file=.env --test 'test/*.test.cjs'
+Remove-Item Env:MYSQL_INTEGRATION_TESTS
 ```
+
+Muốn chạy riêng một chức năng, thay mẫu `test/*.test.cjs` bằng tên file tương ứng, ví dụ `test/invoices-and-combos.integration.test.cjs` cho hóa đơn và combo.

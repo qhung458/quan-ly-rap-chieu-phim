@@ -4,27 +4,27 @@
 -- Khóa ngoại chuỗi phải khớp charset/collation của bảng cũ, kể cả khi mặc định
 -- schema đã đổi sau lúc tạo HoaDon.
 SELECT CONCAT('CHARACTER SET ', CHARACTER_SET_NAME, ' COLLATE ', COLLATION_NAME)
-INTO @g2_invoice_charset
+INTO @invoice_code_charset
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = 'hoadon' AND COLUMN_NAME = 'MaHoaDon';
 
 SELECT CONCAT('CHARACTER SET ', CHARACTER_SET_NAME, ' COLLATE ', COLLATION_NAME)
-INTO @g2_customer_charset
+INTO @invoice_customer_charset
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = 'hoadon' AND COLUMN_NAME = 'MaKhachHang';
 
-SET @g2_create_header = CONCAT(
+SET @create_invoice_header_sql = CONCAT(
     'CREATE TABLE IF NOT EXISTS DauHoaDon (',
-    'MaHoaDon VARCHAR(15) ', @g2_invoice_charset, ' NOT NULL PRIMARY KEY, ',
-    'MaKhachHang VARCHAR(10) ', @g2_customer_charset, ' NOT NULL, ',
+    'MaHoaDon VARCHAR(15) ', @invoice_code_charset, ' NOT NULL PRIMARY KEY, ',
+    'MaKhachHang VARCHAR(10) ', @invoice_customer_charset, ' NOT NULL, ',
     'NgayMua DATETIME NOT NULL, ',
     'CONSTRAINT UQ_DauHoaDon_KhachHang UNIQUE (MaHoaDon, MaKhachHang), ',
     'CONSTRAINT FK_DauHoaDon_KhachHang FOREIGN KEY (MaKhachHang) REFERENCES KhachHang(MaKhachHang), ',
     'INDEX IX_DauHoaDon_NgayMua (NgayMua, MaHoaDon)) ENGINE=InnoDB'
 );
-PREPARE g2_create_header FROM @g2_create_header;
-EXECUTE g2_create_header;
-DEALLOCATE PREPARE g2_create_header;
+PREPARE create_invoice_header FROM @create_invoice_header_sql;
+EXECUTE create_invoice_header;
+DEALLOCATE PREPARE create_invoice_header;
 
 -- Ghép theo cả mã và khách để khóa chính báo lỗi nếu một mã thuộc hai khách.
 INSERT INTO DauHoaDon (MaHoaDon, MaKhachHang, NgayMua)
@@ -44,15 +44,15 @@ JOIN (
 SET d.NgayMua = h.NgayMua
 WHERE d.NgayMua <> h.NgayMua;
 
-SET @g2_add_fk = IF(EXISTS (
+SET @add_invoice_header_fk_sql = IF(EXISTS (
     SELECT 1
     FROM information_schema.REFERENTIAL_CONSTRAINTS
     WHERE CONSTRAINT_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = 'hoadon'
       AND CONSTRAINT_NAME = 'FK_HoaDon_DauHoaDon'
 ), 'DO 0', 'ALTER TABLE HoaDon ADD CONSTRAINT FK_HoaDon_DauHoaDon FOREIGN KEY (MaHoaDon, MaKhachHang) REFERENCES DauHoaDon(MaHoaDon, MaKhachHang) ON DELETE CASCADE');
-PREPARE g2_add_fk FROM @g2_add_fk;
-EXECUTE g2_add_fk;
-DEALLOCATE PREPARE g2_add_fk;
+PREPARE add_invoice_header_fk FROM @add_invoice_header_fk_sql;
+EXECUTE add_invoice_header_fk;
+DEALLOCATE PREPARE add_invoice_header_fk;
 
 CREATE TABLE IF NOT EXISTS DayMaHoaDon (
     Id     TINYINT         NOT NULL PRIMARY KEY CHECK (Id = 1),

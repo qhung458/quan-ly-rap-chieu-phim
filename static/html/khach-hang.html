@@ -41,41 +41,66 @@
               <span class="small d-block" id="customers-export-message" role="status"></span>
             </div>
           </div>
-          <form id="customers-query" class="customer-query mb-3">
-            <fieldset disabled>
-              <label class="form-label mb-0" for="customer-search">Tìm khách hàng</label>
-              <input class="form-control" type="search" id="customer-search" name="q" maxlength="100" placeholder="Mã, tên, số điện thoại hoặc email">
-              <details class="customer-query-details">
-                <summary>Tìm nâng cao</summary>
-                <div class="customer-query-grid">
-                  <label>Mã khách chính xác<input class="form-control" name="maKhachHang" maxlength="10"></label>
-                  <label>Họ và tên<input class="form-control" name="ten" maxlength="100"></label>
-                  <label>SĐT chính xác<input class="form-control" type="tel" name="soDienThoai" maxlength="30"></label>
-                  <label>Email chính xác<input class="form-control" name="email" inputmode="email" maxlength="100"></label>
-                  <label>Email trong hồ sơ
-                    <select class="form-select" name="coEmail">
-                      <option value="">Tất cả</option><option value="true">Có email</option><option value="false">Thiếu email</option>
-                    </select>
-                  </label>
-                  <label>Có vé từ ngày đặt<input class="form-control" type="date" name="veTuNgay"></label>
-                  <label>Có vé đến ngày đặt<input class="form-control" type="date" name="veDenNgay"></label>
-                  <small class="text-secondary customer-query-help">Khoảng ngày tính vé đã đặt hoặc đã sử dụng.</small>
+          <form id="customers-query" class="query-toolbar">
+            <fieldset class="query-layout" disabled aria-label="Điều kiện danh sách khách hàng">
+              <div class="query-head">
+                <label class="query-keyword" for="customer-search">Tìm khách hàng
+                  <input class="form-control form-control-sm" type="search" id="customer-search" name="q" maxlength="100" placeholder="Mã, tên, số điện thoại hoặc email">
+                </label>
+                <div class="query-actions">
+                  <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
                 </div>
-              </details>
-              <label class="customer-query-order">Sắp xếp
-                <select class="form-select" name="sort">
-                  <option value="maKhachHang:asc">Mã khách tăng dần</option>
-                  <option value="maKhachHang:desc">Mã khách giảm dần</option>
-                  <option value="ten:asc">Họ và tên A–Z</option>
-                  <option value="ten:desc">Họ và tên Z–A</option>
-                </select>
-              </label>
-              <div class="customer-query-actions">
-                <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
-                <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
-                <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
               </div>
-              <ul class="customer-query-chips" data-query-conditions aria-label="Điều kiện khách hàng đang áp dụng" hidden></ul>
+              <div class="query-options">
+                <details class="query-section">
+                  <summary>Bộ lọc khách hàng</summary>
+                  <div class="query-section-body query-groups">
+                    <fieldset class="query-group">
+                      <legend>Thông tin khách</legend>
+                      <div class="query-fields query-fields--pair">
+                        <label>Mã khách chính xác<input class="form-control form-control-sm" name="maKhachHang" maxlength="10"></label>
+                        <label>Họ và tên<input class="form-control form-control-sm" name="ten" maxlength="100"></label>
+                      </div>
+                    </fieldset>
+                    <fieldset class="query-group">
+                      <legend>Thông tin liên hệ</legend>
+                      <div class="query-fields">
+                        <label>SĐT chính xác<input class="form-control form-control-sm" type="tel" name="soDienThoai" maxlength="30"></label>
+                        <label>Email chính xác<input class="form-control form-control-sm" name="email" inputmode="email" maxlength="100"></label>
+                        <label>Email trong hồ sơ
+                          <select class="form-select form-select-sm" name="coEmail">
+                            <option value="">Tất cả</option><option value="true">Có email</option><option value="false">Thiếu email</option>
+                          </select>
+                        </label>
+                      </div>
+                    </fieldset>
+                    <fieldset class="query-group">
+                      <legend>Người có vé theo ngày đặt</legend>
+                      <div class="query-fields query-fields--pair">
+                        <label>Từ ngày<input class="form-control form-control-sm" type="date" name="veTuNgay" aria-describedby="customer-ticket-date-help"></label>
+                        <label>Đến ngày<input class="form-control form-control-sm" type="date" name="veDenNgay" aria-describedby="customer-ticket-date-help"></label>
+                      </div>
+                      <small class="text-secondary" id="customer-ticket-date-help">Khoảng ngày tính vé đã đặt hoặc đã sử dụng.</small>
+                    </fieldset>
+                  </div>
+                </details>
+                <details class="query-section">
+                  <summary>Sắp xếp</summary>
+                  <div class="query-section-body query-fields">
+                    <label>Thứ tự danh sách
+                      <select class="form-select form-select-sm" name="sort">
+                        <option value="maKhachHang:asc">Mã khách tăng dần</option>
+                        <option value="maKhachHang:desc">Mã khách giảm dần</option>
+                        <option value="ten:asc">Họ và tên A–Z</option>
+                        <option value="ten:desc">Họ và tên Z–A</option>
+                      </select>
+                    </label>
+                  </div>
+                </details>
+              </div>
+              <ul class="query-chips" data-query-conditions aria-label="Điều kiện khách hàng đang áp dụng" hidden></ul>
             </fieldset>
           </form>
           <div class="table-responsive">
@@ -126,38 +151,63 @@
               <span id="history-count" class="text-secondary small" role="status"></span>
             </div>
             <p id="history-customer" class="small fw-semibold mb-2" hidden></p>
-            <form id="history-query" class="customer-query mb-3" hidden>
-              <fieldset disabled>
-                <label class="form-label mb-0" for="history-search">Tìm vé</label>
-                <input class="form-control" type="search" id="history-search" name="q" maxlength="100" placeholder="Mã vé hoặc tên phim">
-                <details class="customer-query-details">
-                  <summary>Tìm nâng cao</summary>
-                  <div class="customer-query-grid">
-                    <label>Mã vé chính xác<input class="form-control" name="maVe" maxlength="15"></label>
-                    <label>Tên phim<input class="form-control" name="tenPhim" maxlength="150"></label>
-                    <label>Ngày đặt từ<input class="form-control" type="date" name="tuNgay"></label>
-                    <label>Ngày đặt đến<input class="form-control" type="date" name="denNgay"></label>
-                    <label>Phim<select class="form-select" id="history-movie-filter" name="maPhim" multiple size="3" aria-describedby="history-multi-help" disabled></select></label>
-                    <label>Trạng thái
-                      <select class="form-select" name="trangThai" multiple size="3" aria-describedby="history-multi-help">
-                        <option value="DaDat">Đã đặt</option><option value="DaSuDung">Đã sử dụng</option><option value="DaHuy">Đã hủy</option>
-                      </select>
-                    </label>
-                    <small class="text-secondary customer-query-help" id="history-multi-help">Giữ Ctrl hoặc ⌘ để chọn nhiều mục.</small>
-                    <small class="text-danger customer-query-help" id="history-movies-message" role="status" hidden></small>
+            <form id="history-query" class="query-toolbar" hidden>
+              <fieldset class="query-layout" disabled aria-label="Điều kiện lịch sử mua vé">
+                <div class="query-head">
+                  <label class="query-keyword" for="history-search">Tìm vé
+                    <input class="form-control form-control-sm" type="search" id="history-search" name="q" maxlength="100" placeholder="Mã vé hoặc tên phim">
+                  </label>
+                  <div class="query-actions">
+                    <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
                   </div>
-                </details>
-                <label class="customer-query-order">Sắp xếp
-                  <select class="form-select" name="sort">
-                    <option value="ngayDat:desc">Ngày đặt mới nhất</option><option value="ngayDat:asc">Ngày đặt cũ nhất</option>
-                  </select>
-                </label>
-                <div class="customer-query-actions">
-                  <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
-                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
-                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
                 </div>
-                <ul class="customer-query-chips" data-query-conditions aria-label="Điều kiện lịch sử đang áp dụng" hidden></ul>
+                <div class="query-options">
+                  <details class="query-section">
+                    <summary>Bộ lọc vé</summary>
+                    <div class="query-section-body query-groups">
+                      <fieldset class="query-group">
+                        <legend>Thông tin vé</legend>
+                        <div class="query-fields query-fields--pair">
+                          <label>Mã vé chính xác<input class="form-control form-control-sm" name="maVe" maxlength="15"></label>
+                          <label>Tên phim<input class="form-control form-control-sm" name="tenPhim" maxlength="150"></label>
+                        </div>
+                      </fieldset>
+                      <fieldset class="query-group">
+                        <legend>Ngày đặt</legend>
+                        <div class="query-fields query-fields--pair">
+                          <label>Từ ngày<input class="form-control form-control-sm" type="date" name="tuNgay"></label>
+                          <label>Đến ngày<input class="form-control form-control-sm" type="date" name="denNgay"></label>
+                        </div>
+                      </fieldset>
+                      <fieldset class="query-group">
+                        <legend>Phim và trạng thái</legend>
+                        <div class="query-fields query-fields--pair">
+                          <label>Phim<select class="form-select form-select-sm" id="history-movie-filter" name="maPhim" multiple size="3" aria-describedby="history-multi-help" disabled></select></label>
+                          <label>Trạng thái
+                            <select class="form-select form-select-sm" name="trangThai" multiple size="3" aria-describedby="history-multi-help">
+                              <option value="DaDat">Đã đặt</option><option value="DaSuDung">Đã sử dụng</option><option value="DaHuy">Đã hủy</option>
+                            </select>
+                          </label>
+                        </div>
+                        <small class="text-secondary" id="history-multi-help">Giữ Ctrl hoặc ⌘ để chọn nhiều mục.</small>
+                        <small class="text-danger" id="history-movies-message" role="status" hidden></small>
+                      </fieldset>
+                    </div>
+                  </details>
+                  <details class="query-section">
+                    <summary>Sắp xếp</summary>
+                    <div class="query-section-body query-fields">
+                      <label>Thứ tự danh sách
+                        <select class="form-select form-select-sm" name="sort">
+                          <option value="ngayDat:desc">Ngày đặt mới nhất</option><option value="ngayDat:asc">Ngày đặt cũ nhất</option>
+                        </select>
+                      </label>
+                    </div>
+                  </details>
+                </div>
+                <ul class="query-chips" data-query-conditions aria-label="Điều kiện lịch sử đang áp dụng" hidden></ul>
               </fieldset>
             </form>
             <div class="table-responsive">

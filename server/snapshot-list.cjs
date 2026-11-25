@@ -77,4 +77,4 @@ function createSnapshotList({ store, pool, scope, query, load, workbook, paginat
   return { list, exportXlsx };
 }
 
-module.exports = { createSnapshotList };
+module.exports = { createSnapshotList, handleListRequest, only, readSnapshotId };

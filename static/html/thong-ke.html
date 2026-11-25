@@ -31,22 +31,18 @@
     <main class="main-content">
       <h1>Thống kê</h1>
       <p class="page-description">Tổng hợp doanh thu vé và bắp nước theo khoảng ngày.</p>
-      <section class="panel stats-filter" aria-label="Khoảng thời gian">
-        <form id="stats-form" class="stats-form">
-          <div>
-            <label class="form-label" for="stats-from">Từ ngày</label>
-            <input class="form-control" type="date" id="stats-from" required>
+      <section class="query-toolbar stats-filter" aria-label="Khoảng thời gian">
+        <form id="stats-form" class="query-head">
+          <div class="query-fields query-fields--pair stats-period-fields">
+            <label>Từ ngày<input class="form-control" type="date" id="stats-from" required></label>
+            <label>Đến ngày<input class="form-control" type="date" id="stats-to" required></label>
           </div>
-          <div>
-            <label class="form-label" for="stats-to">Đến ngày</label>
-            <input class="form-control" type="date" id="stats-to" required>
-          </div>
-          <button class="btn btn-dark" type="submit" disabled>Xem thống kê</button>
-          <div class="text-end">
+          <div class="query-actions">
+            <button class="btn btn-dark btn-sm" type="submit" disabled>Xem thống kê</button>
             <button type="button" class="btn btn-outline-dark btn-sm" id="stats-export" disabled>Xuất Excel</button>
-            <span class="small d-block" id="stats-export-message" role="status"></span>
           </div>
         </form>
+        <p class="form-message" id="stats-export-message" role="status"></p>
         <p class="form-message" id="stats-message" role="status"></p>
       </section>
       <div class="stat-tiles" id="stat-tiles" aria-live="polite"></div>
@@ -76,41 +72,58 @@
           </div>
         </section>
         <div class="stats-breakdown">
-          <section class="panel" aria-labelledby="film-title">
+          <section class="panel stats-ranking" aria-labelledby="film-title" data-stats-ranking="phim">
             <h2 id="film-title">Doanh thu vé theo phim</h2>
+            <form id="film-filter-form" class="query-toolbar"></form>
+            <p class="small text-secondary mb-2" data-rank-count role="status"></p>
             <div class="table-responsive stats-scroll">
               <table class="table align-middle mb-0" aria-labelledby="film-title">
                 <thead>
                   <tr>
+                    <th scope="col">Mã phim</th>
                     <th scope="col">Phim</th>
                     <th scope="col" class="text-end">Vé</th>
                     <th scope="col">Doanh thu</th>
                   </tr>
                 </thead>
-                <tbody id="film-rows"></tbody>
+                <tbody id="film-rows"><tr><td colspan="4">Đang tải thống kê…</td></tr></tbody>
               </table>
             </div>
+            <nav class="stats-rank-pagination mt-3" aria-label="Phân trang thống kê phim" hidden>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-page-prev>Trang trước</button>
+              <span class="small" role="status" data-page-position></span>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-page-next>Trang sau</button>
+            </nav>
           </section>
-          <section class="panel" aria-labelledby="combo-stat-title">
+          <section class="panel stats-ranking" aria-labelledby="combo-stat-title" data-stats-ranking="combo">
             <h2 id="combo-stat-title">Doanh thu theo combo</h2>
+            <form id="combo-filter-form" class="query-toolbar"></form>
+            <p class="small text-secondary mb-2" data-rank-count role="status"></p>
             <div class="table-responsive stats-scroll">
               <table class="table align-middle mb-0" aria-labelledby="combo-stat-title">
                 <thead>
                   <tr>
+                    <th scope="col">Mã combo</th>
                     <th scope="col">Combo</th>
                     <th scope="col" class="text-end">Số lượng</th>
                     <th scope="col">Doanh thu</th>
                   </tr>
                 </thead>
-                <tbody id="combo-stat-rows"></tbody>
+                <tbody id="combo-stat-rows"><tr><td colspan="4">Đang tải thống kê…</td></tr></tbody>
               </table>
             </div>
+            <nav class="stats-rank-pagination mt-3" aria-label="Phân trang thống kê combo" hidden>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-page-prev>Trang trước</button>
+              <span class="small" role="status" data-page-position></span>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-page-next>Trang sau</button>
+            </nav>
           </section>
         </div>
       </div>
       <p class="stats-note">Doanh thu vé tính theo ngày chiếu, không gồm vé đã hủy và suất bị hủy. Doanh thu bắp nước tính theo ngày lập hóa đơn.</p>
     </main>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="../js/truy-van-danh-sach.js"></script>
     <script src="../js/xuat-excel.js"></script>
     <script src="../js/thong-ke.js"></script>
   </body>

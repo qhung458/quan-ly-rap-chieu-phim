@@ -1,8 +1,7 @@
 node_modules/
 .env
 /test/*
-!/test/g5.integration.test.cjs
-!/test/g6.integration.test.cjs
+!/test/*.test.cjs
 !/test/fixtures/
 /test/fixtures/*
 !/test/fixtures/mysql-app.cjs

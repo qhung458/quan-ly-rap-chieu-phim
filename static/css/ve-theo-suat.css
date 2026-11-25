@@ -1,71 +1,12 @@
-.show-ticket-query > fieldset,
-.show-ticket-advanced[open],
-.show-ticket-grid {
-  display: grid;
-  min-width: 0;
-  gap: 0.75rem;
-}
-
-.show-ticket-query {
-  margin-bottom: 0.75rem;
-}
-
-.show-ticket-query label,
-.show-ticket-statuses legend {
-  min-width: 0;
-  font-size: 0.875rem;
-}
-
-.show-ticket-query label > :is(.form-control, .form-select) {
-  margin-top: 0.25rem;
-}
-
-.show-ticket-advanced summary {
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.show-ticket-grid {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
-  align-items: start;
-}
-
-.show-ticket-statuses {
-  min-width: 0;
-  grid-column: 1 / -1;
-}
-
-.show-ticket-statuses legend {
-  margin-bottom: 0.35rem;
-}
-
-.show-ticket-actions,
-.show-ticket-chips,
 .show-ticket-pages {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 0.75rem;
-}
-
-.show-ticket-chips {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.show-ticket-chips button {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  text-align: start;
-}
-
-.show-ticket-pages {
   justify-content: flex-end;
 }
 
-.show-ticket-pages[hidden],
-.show-ticket-chips[hidden] {
+.show-ticket-pages[hidden] {
   display: none;
 }
 

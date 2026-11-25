@@ -111,8 +111,8 @@ async function signUp(request, username) {
   }, 201);
 }
 
-async function download(request, route, cookie, snapshotId) {
-  const response = await request(route, { cookie, query: { snapshotId } });
+async function download(request, route, cookie, snapshotId, query = {}) {
+  const response = await request(route, { cookie, query: { ...query, snapshotId } });
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('content-type'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   const book = new ExcelJS.Workbook();

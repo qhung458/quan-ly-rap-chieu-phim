@@ -105,36 +105,41 @@
                 </select>
                 <label class="form-label" for="ticket-room">Phòng chiếu</label>
                 <input class="form-control form-control-sm" id="ticket-room" type="text" readonly />
-                <label class="form-label" for="ticket-customer-search">Tìm khách hàng</label>
-                <div class="ticket-customer-lookup">
-                  <input
-                    class="form-control form-control-sm"
-                    id="ticket-customer-search"
-                    type="search"
-                    placeholder="Nhập mã, tên hoặc số điện thoại"
-                    maxlength="100"
-                    autocomplete="off"
-                    aria-controls="ticket-customer"
-                    aria-describedby="ticket-customer-search-status"
-                    disabled
-                  />
-                  <small class="text-secondary" id="ticket-customer-search-status" role="status"></small>
-                  <button class="btn btn-outline-secondary btn-sm" id="ticket-customer-more" type="button" aria-controls="ticket-customer" disabled hidden>
-                    Tải thêm khách
-                  </button>
-                </div>
-                <label class="form-label" for="ticket-customer"
-                  >Khách hàng</label
-                >
-                <select
-                  class="form-select form-select-sm"
-                  id="ticket-customer"
-                  name="MaKhachHang"
-                  required
-                  disabled
-                >
-                  <option value="">Chọn khách hàng</option>
-                </select>
+                <fieldset class="ticket-customer-lookup">
+                  <legend>Khách hàng</legend>
+                  <div class="ticket-customer-fields">
+                    <label for="ticket-customer-search">Tìm khách hàng
+                      <input
+                        class="form-control form-control-sm"
+                        id="ticket-customer-search"
+                        type="search"
+                        placeholder="Mã, tên hoặc số điện thoại"
+                        maxlength="100"
+                        autocomplete="off"
+                        aria-controls="ticket-customer"
+                        aria-describedby="ticket-customer-search-status"
+                        disabled
+                      />
+                    </label>
+                    <label for="ticket-customer">Chọn khách
+                      <select
+                        class="form-select form-select-sm"
+                        id="ticket-customer"
+                        name="MaKhachHang"
+                        required
+                        disabled
+                      >
+                        <option value="">Chọn khách hàng</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="ticket-customer-feedback">
+                    <small class="text-secondary" id="ticket-customer-search-status" role="status"></small>
+                    <button class="btn btn-outline-secondary btn-sm" id="ticket-customer-more" type="button" aria-controls="ticket-customer" disabled hidden>
+                      Tải thêm khách
+                    </button>
+                  </div>
+                </fieldset>
                 <label class="form-label" for="ticket-seat">Các ghế đã chọn</label>
                 <textarea
                   class="form-control form-control-sm"

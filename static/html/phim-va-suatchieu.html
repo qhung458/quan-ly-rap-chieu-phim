@@ -49,42 +49,79 @@
                 <span class="small d-block" id="phim-export-message" role="status"></span>
               </div>
             </div>
-            <form id="phim-filter-form" class="catalog-query mb-3" data-query-form>
-              <fieldset disabled aria-label="Điều kiện danh sách phim">
-                <div class="catalog-filters">
-                  <label>Mã hoặc tên phim<input class="form-control" id="movie-search" name="q" type="search" maxlength="100"></label>
-                  <label>Thể loại<select class="form-select" id="genre-filter" name="theLoai" multiple size="3" aria-describedby="genre-help"></select></label>
-                </div>
-                <p class="catalog-help" id="genre-help">Giữ Ctrl hoặc ⌘ để chọn nhiều thể loại.</p>
-                <details class="catalog-advanced">
-                  <summary>Tìm nâng cao</summary>
-                  <div class="catalog-filters">
-                    <label>Mã phim chính xác<input class="form-control" name="maPhim" maxlength="15"></label>
-                    <label>Tên phim<input class="form-control" name="tenPhim" maxlength="150"></label>
-                    <label>Đạo diễn<input class="form-control" name="daoDien" maxlength="100"></label>
-                    <label>Khởi chiếu từ ngày<input class="form-control" name="tuNgay" type="date"></label>
-                    <label>Khởi chiếu đến ngày<input class="form-control" name="denNgay" type="date"></label>
-                    <label>Số phút từ<input class="form-control" name="phutMin" type="number" min="1" max="2147483647"></label>
-                    <label>Số phút đến<input class="form-control" name="phutMax" type="number" min="1" max="2147483647"></label>
-                    <label>Độ tuổi tối thiểu không quá<input class="form-control" name="tuoiToiDa" type="number" min="0" max="2147483647"></label>
-                  </div>
-                </details>
-                <div class="catalog-filters catalog-order">
-                  <label>Sắp xếp theo
-                    <select class="form-select" data-sort-main>
-                      <option value="maPhim">Mã phim</option><option value="tenPhim">Tên phim</option><option value="ngayKhoiChieu">Ngày khởi chiếu</option><option value="thoiLuong">Thời lượng</option><option value="doTuoi">Độ tuổi</option>
-                    </select>
+            <form id="phim-filter-form" class="query-toolbar" data-query-form>
+              <fieldset class="query-layout" disabled aria-label="Điều kiện danh sách phim">
+                <div class="query-head">
+                  <label class="query-keyword">Tìm phim
+                    <input class="form-control form-control-sm" id="movie-search" name="q" type="search" maxlength="100" placeholder="Nhập mã hoặc tên phim">
                   </label>
-                  <label>Chiều chính<select class="form-select" data-sort-main-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
-                  <label>Tiêu chí phụ<select class="form-select" data-sort-extra><option value="">Không chọn</option></select></label>
-                  <label>Chiều phụ<select class="form-select" data-sort-extra-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                  <div class="query-actions">
+                    <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
+                  </div>
                 </div>
-                <div class="catalog-actions">
-                  <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
-                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
-                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
+                <div class="query-options">
+                  <details class="query-section">
+                    <summary>Bộ lọc phim</summary>
+                    <div class="query-section-body query-groups">
+                      <fieldset class="query-group">
+                        <legend>Thông tin phim</legend>
+                        <div class="query-fields">
+                          <label>Mã phim chính xác<input class="form-control form-control-sm" name="maPhim" maxlength="15"></label>
+                          <label>Tên phim<input class="form-control form-control-sm" name="tenPhim" maxlength="150"></label>
+                          <label>Đạo diễn<input class="form-control form-control-sm" name="daoDien" maxlength="100"></label>
+                        </div>
+                      </fieldset>
+                      <fieldset class="query-group">
+                        <legend>Phân loại</legend>
+                        <div class="query-fields">
+                          <label>Thể loại<select class="form-select form-select-sm" id="genre-filter" name="theLoai" multiple size="3" aria-describedby="genre-help"></select></label>
+                          <label>Độ tuổi tối thiểu không quá<input class="form-control form-control-sm" name="tuoiToiDa" type="number" min="0" max="2147483647"></label>
+                        </div>
+                        <small class="text-secondary" id="genre-help">Giữ Ctrl hoặc ⌘ để chọn nhiều thể loại.</small>
+                      </fieldset>
+                      <fieldset class="query-group">
+                        <legend>Ngày khởi chiếu</legend>
+                        <div class="query-fields query-fields--pair">
+                          <label>Từ ngày<input class="form-control form-control-sm" name="tuNgay" type="date"></label>
+                          <label>Đến ngày<input class="form-control form-control-sm" name="denNgay" type="date"></label>
+                        </div>
+                      </fieldset>
+                      <fieldset class="query-group">
+                        <legend>Thời lượng (phút)</legend>
+                        <div class="query-fields query-fields--pair">
+                          <label>Từ<input class="form-control form-control-sm" name="phutMin" type="number" min="1" max="2147483647"></label>
+                          <label>Đến<input class="form-control form-control-sm" name="phutMax" type="number" min="1" max="2147483647"></label>
+                        </div>
+                      </fieldset>
+                    </div>
+                  </details>
+                  <details class="query-section">
+                    <summary>Sắp xếp</summary>
+                    <div class="query-section-body query-groups query-groups--paired">
+                      <fieldset class="query-group">
+                        <legend>Thứ tự chính</legend>
+                        <div class="query-fields query-fields--pair">
+                          <label>Tiêu chí
+                            <select class="form-select form-select-sm" data-sort-main>
+                              <option value="maPhim">Mã phim</option><option value="tenPhim">Tên phim</option><option value="ngayKhoiChieu">Ngày khởi chiếu</option><option value="thoiLuong">Thời lượng</option><option value="doTuoi">Độ tuổi</option>
+                            </select>
+                          </label>
+                          <label>Chiều<select class="form-select form-select-sm" data-sort-main-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                        </div>
+                      </fieldset>
+                      <fieldset class="query-group">
+                        <legend>Thứ tự phụ</legend>
+                        <div class="query-fields query-fields--pair">
+                          <label>Tiêu chí<select class="form-select form-select-sm" data-sort-extra><option value="">Không chọn</option></select></label>
+                          <label>Chiều<select class="form-select form-select-sm" data-sort-extra-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                        </div>
+                      </fieldset>
+                    </div>
+                  </details>
                 </div>
-                <ul class="catalog-conditions" data-query-conditions aria-label="Điều kiện đang áp dụng" hidden></ul>
+                <ul class="query-chips" data-query-conditions aria-label="Điều kiện đang áp dụng" hidden></ul>
               </fieldset>
             </form>
             <div class="table-responsive">
@@ -141,51 +178,91 @@
                 <span class="small d-block" id="suat-chieu-export-message" role="status"></span>
               </div>
             </div>
-            <form id="suat-chieu-filter-form" class="catalog-query mb-3" data-query-form>
-              <fieldset disabled aria-label="Điều kiện danh sách suất chiếu">
-                <div class="catalog-filters">
-                  <label>Mã suất, tên phim hoặc phòng<input class="form-control" id="showtime-search" name="q" type="search" maxlength="100"></label>
-                  <label>Chiếu từ ngày<input class="form-control" id="date-filter" name="tuNgay" type="date"></label>
-                  <label>Chiếu đến ngày<input class="form-control" name="denNgay" type="date"></label>
-                </div>
-                <details class="catalog-advanced">
-                  <summary>Tìm nâng cao</summary>
-                  <div class="catalog-filters">
-                    <label>Mã suất chính xác<input class="form-control" name="maSuatChieu" maxlength="20"></label>
-                    <label>Tên phim<input class="form-control" name="tenPhim" maxlength="150"></label>
-                    <label>Tên phòng<input class="form-control" name="tenPhong" maxlength="50"></label>
-                    <label>Phim<select class="form-select" id="movie-filter" name="maPhim" multiple size="3" aria-describedby="showtime-multi-help"></select></label>
-                    <label>Phòng<select class="form-select" id="room-filter" name="maPhong" multiple size="3" aria-describedby="showtime-multi-help"></select></label>
-                    <label>Trạng thái
-                      <select class="form-select" name="trangThai" multiple size="3" aria-describedby="showtime-multi-help">
-                        <option value="SapChieu">Sắp chiếu</option><option value="DangChieu">Đang chiếu</option><option value="KetThuc">Kết thúc</option><option value="Huy">Hủy</option>
-                      </select>
-                    </label>
-                  </div>
-                  <p class="catalog-help" id="showtime-multi-help">Giữ Ctrl hoặc ⌘ để chọn nhiều phim, phòng hoặc trạng thái.</p>
-                  <div class="catalog-filters">
-                    <label>Bắt đầu từ giờ<input class="form-control" name="gioTu" type="time" step="1"></label>
-                    <label>Bắt đầu đến giờ<input class="form-control" name="gioDen" type="time" step="1"></label>
-                    <label>Giá vé từ (₫)<input class="form-control" name="giaMin" type="number" min="0" step="0.01"></label>
-                    <label>Giá vé đến (₫)<input class="form-control" name="giaMax" type="number" min="0" step="0.01"></label>
-                  </div>
-                </details>
-                <div class="catalog-filters catalog-order">
-                  <label>Sắp xếp theo
-                    <select class="form-select" data-sort-main>
-                      <option value="lich">Lịch chiếu</option><option value="phong">Phòng</option><option value="phim">Phim</option><option value="giaVe">Giá vé</option><option value="maSuatChieu">Mã suất</option>
-                    </select>
+            <form id="suat-chieu-filter-form" class="query-toolbar" data-query-form>
+              <fieldset class="query-layout" disabled aria-label="Điều kiện danh sách suất chiếu">
+                <div class="query-head">
+                  <label class="query-keyword">Tìm suất chiếu
+                    <input class="form-control form-control-sm" id="showtime-search" name="q" type="search" maxlength="100" placeholder="Nhập mã suất, tên phim hoặc phòng">
                   </label>
-                  <label>Chiều chính<select class="form-select" data-sort-main-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
-                  <label>Tiêu chí phụ<select class="form-select" data-sort-extra><option value="">Không chọn</option></select></label>
-                  <label>Chiều phụ<select class="form-select" data-sort-extra-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                  <div class="query-actions">
+                    <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
+                  </div>
                 </div>
-                <div class="catalog-actions">
-                  <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
-                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
-                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
+                <div class="query-options">
+                  <details class="query-section">
+                    <summary>Bộ lọc suất chiếu</summary>
+                    <div class="query-section-body query-groups">
+                      <fieldset class="query-group">
+                        <legend>Ngày chiếu</legend>
+                        <div class="query-fields query-fields--pair">
+                          <label>Từ ngày<input class="form-control form-control-sm" id="date-filter" name="tuNgay" type="date"></label>
+                          <label>Đến ngày<input class="form-control form-control-sm" name="denNgay" type="date"></label>
+                        </div>
+                      </fieldset>
+                      <fieldset class="query-group">
+                        <legend>Giờ bắt đầu</legend>
+                        <div class="query-fields query-fields--pair">
+                          <label>Từ giờ<input class="form-control form-control-sm" name="gioTu" type="time" step="1"></label>
+                          <label>Đến giờ<input class="form-control form-control-sm" name="gioDen" type="time" step="1"></label>
+                        </div>
+                      </fieldset>
+                      <fieldset class="query-group">
+                        <legend>Thông tin suất</legend>
+                        <div class="query-fields">
+                          <label>Mã suất chính xác<input class="form-control form-control-sm" name="maSuatChieu" maxlength="20"></label>
+                          <label>Tên phim<input class="form-control form-control-sm" name="tenPhim" maxlength="150"></label>
+                          <label>Tên phòng<input class="form-control form-control-sm" name="tenPhong" maxlength="50"></label>
+                        </div>
+                      </fieldset>
+                      <fieldset class="query-group">
+                        <legend>Giá vé (₫)</legend>
+                        <div class="query-fields query-fields--pair">
+                          <label>Từ<input class="form-control form-control-sm" name="giaMin" type="number" min="0" step="0.01"></label>
+                          <label>Đến<input class="form-control form-control-sm" name="giaMax" type="number" min="0" step="0.01"></label>
+                        </div>
+                      </fieldset>
+                      <fieldset class="query-group">
+                        <legend>Phim, phòng và trạng thái</legend>
+                        <div class="query-fields">
+                          <label>Phim<select class="form-select form-select-sm" id="movie-filter" name="maPhim" multiple size="3" aria-describedby="showtime-multi-help"></select></label>
+                          <label>Phòng<select class="form-select form-select-sm" id="room-filter" name="maPhong" multiple size="3" aria-describedby="showtime-multi-help"></select></label>
+                          <label>Trạng thái
+                            <select class="form-select form-select-sm" name="trangThai" multiple size="3" aria-describedby="showtime-multi-help">
+                              <option value="SapChieu">Sắp chiếu</option><option value="DangChieu">Đang chiếu</option><option value="KetThuc">Kết thúc</option><option value="Huy">Hủy</option>
+                            </select>
+                          </label>
+                        </div>
+                        <small class="text-secondary" id="showtime-multi-help">Giữ Ctrl hoặc ⌘ để chọn nhiều mục.</small>
+                      </fieldset>
+                    </div>
+                  </details>
+                  <details class="query-section">
+                    <summary>Sắp xếp</summary>
+                    <div class="query-section-body query-groups query-groups--paired">
+                      <fieldset class="query-group">
+                        <legend>Thứ tự chính</legend>
+                        <div class="query-fields query-fields--pair">
+                          <label>Tiêu chí
+                            <select class="form-select form-select-sm" data-sort-main>
+                              <option value="lich">Lịch chiếu</option><option value="phong">Phòng</option><option value="phim">Phim</option><option value="giaVe">Giá vé</option><option value="maSuatChieu">Mã suất</option>
+                            </select>
+                          </label>
+                          <label>Chiều<select class="form-select form-select-sm" data-sort-main-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                        </div>
+                      </fieldset>
+                      <fieldset class="query-group">
+                        <legend>Thứ tự phụ</legend>
+                        <div class="query-fields query-fields--pair">
+                          <label>Tiêu chí<select class="form-select form-select-sm" data-sort-extra><option value="">Không chọn</option></select></label>
+                          <label>Chiều<select class="form-select form-select-sm" data-sort-extra-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                        </div>
+                      </fieldset>
+                    </div>
+                  </details>
                 </div>
-                <ul class="catalog-conditions" data-query-conditions aria-label="Điều kiện đang áp dụng" hidden></ul>
+                <ul class="query-chips" data-query-conditions aria-label="Điều kiện đang áp dụng" hidden></ul>
               </fieldset>
             </form>
             <div class="table-responsive">

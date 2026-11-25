@@ -1,60 +1,11 @@
-.customer-query fieldset,
-.customer-query-grid {
-  display: grid;
-  gap: 0.5rem;
-  min-width: 0;
-}
-
-.customer-query-grid {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
-  margin-top: 0.5rem;
-}
-
-.customer-query-details summary,
-.customer-query-details label,
-.customer-query-order {
-  font-size: 0.875rem;
-}
-
-.customer-query-details summary {
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.customer-query-help {
-  grid-column: 1 / -1;
-}
-
-.customer-query-order {
-  max-width: 17rem;
-}
-
-.customer-query-actions,
-.customer-query-chips,
 .customer-query-pages {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.5rem;
 }
 
-.customer-query-chips {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.customer-query-chips button {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  text-align: start;
-}
-
-.customer-query-pages {
-  justify-content: flex-end;
-}
-
-.customer-query-chips[hidden],
 .customer-query-pages[hidden] {
   display: none;
 }

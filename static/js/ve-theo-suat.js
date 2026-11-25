@@ -19,56 +19,98 @@ window.ShowTicketList = (() => {
   function mount(root, { onSelect, exportId } = {}) {
     const counter = typeof onSelect === 'function';
     root.innerHTML = `
-      <form class="show-ticket-query">
-        <fieldset disabled aria-label="Điều kiện danh sách vé">
-          <label>Tìm vé hoặc khách
-            <input class="form-control form-control-sm" name="q" type="search" maxlength="100"
-              placeholder="Mã vé, mã khách, tên khách hoặc SĐT">
-          </label>
-          <details class="show-ticket-advanced">
-            <summary>Tìm nâng cao</summary>
-            <div class="show-ticket-grid">
-              <label>Mã vé<input class="form-control form-control-sm" name="maVe" maxlength="15"></label>
-              <label>Cách so mã vé<select class="form-select form-select-sm" name="maVeMode">
-                <option value="contains">Chứa</option><option value="exact">Chính xác</option>
-              </select></label>
-              <label>Mã khách<input class="form-control form-control-sm" name="maKhachHang" maxlength="10"></label>
-              <label>Cách so mã khách<select class="form-select form-select-sm" name="maKhachHangMode">
-                <option value="contains">Chứa</option><option value="exact">Chính xác</option>
-              </select></label>
-              <label>SĐT chính xác<input class="form-control form-control-sm" name="soDienThoai" type="tel" maxlength="30"></label>
-              <label>Hàng ghế<input class="form-control form-control-sm" name="hang" maxlength="5"></label>
-              <label>Số ghế<input class="form-control form-control-sm" name="soGhe" type="number" min="1" max="2147483647"></label>
-              <label>Đặt từ ngày<input class="form-control form-control-sm" name="tuNgay" type="date"></label>
-              <label>Đặt đến ngày<input class="form-control form-control-sm" name="denNgay" type="date"></label>
-              <fieldset class="show-ticket-statuses">
-                <legend>Trạng thái</legend>
-                <div class="show-ticket-actions">
-                  ${Object.entries(statuses).map(([value, label]) => `<label><input class="form-check-input" type="checkbox" name="trangThai" value="${value}"> ${label}</label>`).join('')}
-                </div>
-              </fieldset>
+      <form class="query-toolbar show-ticket-query">
+        <fieldset class="query-layout" disabled aria-label="Điều kiện danh sách vé">
+          <div class="query-head">
+            <label class="query-keyword">Tìm vé hoặc khách
+              <input class="form-control form-control-sm" name="q" type="search" maxlength="100"
+                placeholder="Mã vé, mã khách, tên khách hoặc SĐT">
+            </label>
+            <div class="query-actions">
+              <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
+              <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
+              <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
             </div>
-          </details>
-          <div class="show-ticket-grid">
-            <label>Sắp xếp theo<select class="form-select form-select-sm" data-sort-main>
-              ${Object.entries(sortLabels).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}
-            </select></label>
-            <label>Chiều chính<select class="form-select form-select-sm" data-sort-main-dir>
-              <option value="asc">Tăng dần</option><option value="desc">Giảm dần</option>
-            </select></label>
-            <label>Tiêu chí phụ<select class="form-select form-select-sm" data-sort-extra>
-              <option value="">Không chọn</option>
-            </select></label>
-            <label>Chiều phụ<select class="form-select form-select-sm" data-sort-extra-dir>
-              <option value="asc">Tăng dần</option><option value="desc">Giảm dần</option>
-            </select></label>
           </div>
-          <div class="show-ticket-actions">
-            <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
-            <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
-            <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
+          <div class="query-options">
+            <details class="query-section">
+              <summary>Bộ lọc vé</summary>
+              <div class="query-section-body">
+                <div class="query-groups">
+                  <fieldset class="query-group">
+                    <legend>Vé và vị trí ghế</legend>
+                    <div class="query-layout">
+                      <div class="query-fields query-fields--pair">
+                        <label>Mã vé<input class="form-control form-control-sm" name="maVe" maxlength="15"></label>
+                        <label>Cách so mã vé<select class="form-select form-select-sm" name="maVeMode">
+                          <option value="contains">Chứa</option><option value="exact">Chính xác</option>
+                        </select></label>
+                      </div>
+                      <div class="query-fields query-fields--pair">
+                        <label>Hàng ghế<input class="form-control form-control-sm" name="hang" maxlength="5"></label>
+                        <label>Số ghế<input class="form-control form-control-sm" name="soGhe" type="number" min="1" max="2147483647"></label>
+                      </div>
+                    </div>
+                  </fieldset>
+                  <fieldset class="query-group">
+                    <legend>Khách hàng</legend>
+                    <div class="query-layout">
+                      <div class="query-fields query-fields--pair">
+                        <label>Mã khách<input class="form-control form-control-sm" name="maKhachHang" maxlength="10"></label>
+                        <label>Cách so mã khách<select class="form-select form-select-sm" name="maKhachHangMode">
+                          <option value="contains">Chứa</option><option value="exact">Chính xác</option>
+                        </select></label>
+                      </div>
+                      <label>SĐT chính xác<input class="form-control form-control-sm" name="soDienThoai" type="tel" maxlength="30"></label>
+                    </div>
+                  </fieldset>
+                  <fieldset class="query-group">
+                    <legend>Ngày đặt</legend>
+                    <div class="query-fields query-fields--pair">
+                      <label>Từ ngày<input class="form-control form-control-sm" name="tuNgay" type="date"></label>
+                      <label>Đến ngày<input class="form-control form-control-sm" name="denNgay" type="date"></label>
+                    </div>
+                  </fieldset>
+                  <fieldset class="query-group">
+                    <legend>Trạng thái vé</legend>
+                    <div class="query-checks">
+                      ${Object.entries(statuses).map(([value, label]) => `<label><input class="form-check-input" type="checkbox" name="trangThai" value="${value}"> ${label}</label>`).join('')}
+                    </div>
+                  </fieldset>
+                </div>
+              </div>
+            </details>
+            <details class="query-section">
+              <summary>Sắp xếp</summary>
+              <div class="query-section-body">
+                <div class="query-groups query-groups--paired">
+                  <fieldset class="query-group">
+                    <legend>Thứ tự chính</legend>
+                    <div class="query-fields query-fields--pair">
+                      <label>Tiêu chí<select class="form-select form-select-sm" data-sort-main>
+                        ${Object.entries(sortLabels).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}
+                      </select></label>
+                      <label>Chiều<select class="form-select form-select-sm" data-sort-main-dir>
+                        <option value="asc">Tăng dần</option><option value="desc">Giảm dần</option>
+                      </select></label>
+                    </div>
+                  </fieldset>
+                  <fieldset class="query-group">
+                    <legend>Thứ tự phụ</legend>
+                    <div class="query-fields query-fields--pair">
+                      <label>Tiêu chí<select class="form-select form-select-sm" data-sort-extra>
+                        <option value="">Không chọn</option>
+                      </select></label>
+                      <label>Chiều<select class="form-select form-select-sm" data-sort-extra-dir>
+                        <option value="asc">Tăng dần</option><option value="desc">Giảm dần</option>
+                      </select></label>
+                    </div>
+                  </fieldset>
+                </div>
+              </div>
+            </details>
           </div>
-          <ul class="show-ticket-chips" data-query-conditions aria-label="Điều kiện vé đang áp dụng" hidden></ul>
+          <ul class="query-chips" data-query-conditions aria-label="Điều kiện vé đang áp dụng" hidden></ul>
         </fieldset>
       </form>
       <p class="small text-secondary mb-1" data-ticket-count role="status"></p>

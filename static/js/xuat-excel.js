@@ -75,12 +75,17 @@ window.ExcelExport = (() => {
   }
 
   async function download(request) {
-    const { url, snapshotId, filename } = request ?? {};
+    const { url, snapshotId, filename, query = {} } = request ?? {};
     if (!snapshotId) throw new Error('Tải danh sách trước khi xuất Excel.');
     if (!url || !filename) throw new Error('Thông tin xuất Excel không hợp lệ.');
     const endpoint = new URL(url, window.location.href);
     if (endpoint.origin !== window.location.origin) throw new Error('Địa chỉ xuất Excel không hợp lệ.');
     endpoint.search = '';
+    for (const [name, value] of Object.entries(query)) {
+      for (const item of Array.isArray(value) ? value : [value]) {
+        if (item !== null && item !== undefined && item !== '') endpoint.searchParams.append(name, item);
+      }
+    }
     endpoint.searchParams.set('snapshotId', snapshotId);
     const response = await fetch(endpoint, { credentials: 'same-origin', cache: 'no-store' });
     if (!response.ok) {
