@@ -10,11 +10,69 @@
 
 .catalog-filters {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  align-items: start;
 }
 
-.catalog-layout fieldset > .form-control,
-.catalog-layout fieldset > .form-select {
+.catalog-layout .form-stack fieldset > .form-control,
+.catalog-layout .form-stack fieldset > .form-select {
   margin-bottom: 0.75rem;
+}
+
+.catalog-query fieldset,
+.catalog-advanced[open] {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.catalog-advanced summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.catalog-query label,
+.catalog-help {
+  min-width: 0;
+  font-size: 0.875rem;
+}
+
+.catalog-filters :is(input, select) {
+  margin-top: 0.25rem;
+}
+
+.catalog-help {
+  margin: 0;
+  color: var(--bs-secondary-color, #495057);
+}
+
+.catalog-actions,
+.catalog-conditions,
+.catalog-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.catalog-conditions {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.catalog-condition {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+
+.catalog-pagination {
+  justify-content: flex-end;
+}
+
+.catalog-conditions[hidden],
+.catalog-pagination[hidden] {
+  display: none;
 }
 
 @media (min-width: 1200px) {

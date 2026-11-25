@@ -4,13 +4,15 @@ const byId = id => document.getElementById(id);
 const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 2 });
 const statusLabels = { SapChieu: 'Sắp chiếu', DangChieu: 'Đang chiếu', KetThuc: 'Kết thúc', Huy: 'Hủy' };
 const formatDate = date => date.split('-').reverse().join('/');
-const normalize = text => text.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replaceAll('đ', 'd');
 let movies = [];
-let rooms = [];
+let optionsVersion = 0;
+let moviesLoaded = false;
+let roomsLoaded = false;
 
 async function request(url, method = 'GET', data) {
   const response = await fetch(url, {
     method,
+    cache: 'no-store',
     ...(data && { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
   });
   if (response.status === 401) {
@@ -24,23 +26,55 @@ async function request(url, method = 'GET', data) {
 }
 
 function setOptions(select, entries) {
-  const previous = select.value;
-  select.replaceChildren(select.options[0], ...entries.map(([value, label]) => new Option(label, value)));
-  select.value = entries.some(([value]) => value === previous) ? previous : '';
+  const previous = new Set(Array.from(select.selectedOptions, option => option.value));
+  const placeholder = select.multiple ? [] : [select.options[0]];
+  select.replaceChildren(...placeholder, ...entries.map(([value, label]) =>
+    new Option(label, value, false, previous.has(value))));
+  if (!select.multiple && !entries.some(([value]) => previous.has(value))) select.value = '';
 }
 
-function syncMovies(rows) {
-  movies = rows;
-  const entries = rows.map(movie => [movie.MaPhim, movie.TenPhim + ' (' + movie.MaPhim + ')']);
-  setOptions(byId('ShowMovie'), entries);
-  setOptions(byId('movie-filter'), entries);
-  const genres = [...new Set(rows.map(movie => movie.TheLoai))].sort((a, b) => a.localeCompare(b, 'vi'));
-  setOptions(byId('genre-filter'), genres.map(genre => [genre, genre]));
+async function refreshOptions() {
+  const version = ++optionsVersion;
+  const [movieOptions, roomOptions] = await Promise.allSettled([
+    request('/api/phim/tuy-chon'), request('/api/phong-chieu/tuy-chon')
+  ]);
+  if (version !== optionsVersion) return;
+
+  if (movieOptions.status === 'fulfilled') {
+    movies = movieOptions.value.phim;
+    const entries = movies.map(movie => [movie.MaPhim, `${movie.TenPhim} (${movie.MaPhim})`]);
+    setOptions(byId('ShowMovie'), entries);
+    setOptions(byId('movie-filter'), entries);
+    setOptions(byId('genre-filter'), movieOptions.value.theLoai.map(genre => [genre.value, genre.label]));
+    moviesLoaded = true;
+  }
+  if (roomOptions.status === 'fulfilled') {
+    const entries = roomOptions.value.map(room => [room.MaPhong, `${room.TenPhong} (${room.MaPhong})`]);
+    setOptions(byId('MaPhong'), entries);
+    setOptions(byId('room-filter'), entries);
+    roomsLoaded = true;
+  }
+  if (moviesLoaded && roomsLoaded) showtimeCatalog.enableEditor();
+  movieCatalog.refreshConditions();
+  showtimeCatalog.refreshConditions();
+  const failed = [movieOptions, roomOptions].some(result => result.status === 'rejected');
+  byId('page-error').textContent = failed ? 'Không thể tải tất cả tùy chọn phim và phòng. Hãy bấm Tải lại để thử lại.' : '';
 }
 
-function makeCatalog({ id, key, label, filters, matches, cells, sheet, onLoad }) {
+function makeCatalog({ id, key, label, defaultSort, labels, cells, onMutation }) {
   const section = byId(id);
-  const form = section.querySelector('form');
+  const filterForm = section.querySelector('[data-query-form]');
+  const filters = Array.from(filterForm.querySelectorAll('[name]'));
+  const mainSort = filterForm.querySelector('[data-sort-main]');
+  const mainDirection = filterForm.querySelector('[data-sort-main-dir]');
+  const extraSort = filterForm.querySelector('[data-sort-extra]');
+  const extraDirection = filterForm.querySelector('[data-sort-extra-dir]');
+  const chips = filterForm.querySelector('[data-query-conditions]');
+  const pagination = section.querySelector('[data-query-pagination]');
+  const next = pagination.querySelector('[data-page-next]');
+  const previous = pagination.querySelector('[data-page-prev]');
+  const pagePosition = pagination.querySelector('[data-page-position]');
+  const form = section.querySelector('.form-stack');
   const fieldset = form.querySelector('fieldset');
   const table = section.querySelector('table');
   const body = table.tBodies[0];
@@ -50,12 +84,86 @@ function makeCatalog({ id, key, label, filters, matches, cells, sheet, onLoad })
   const code = form.elements.namedItem(key);
   const message = form.querySelector('.form-message');
   const endpoint = '/api/' + id;
-  let rows = [];
   let selected = '';
-  const enableExport = ExcelExport.bind(id + '-export', () => ({
+  let saving = false;
+  for (const option of mainSort.options) extraSort.append(option.cloneNode(true));
+
+  const enableExport = ExcelExport.bindDownload(id + '-export', () => ({
     filename: id,
-    sheets: [{ name: sheet.name, columns: sheet.columns, rows: rows.filter(matches).map(sheet.row) }]
+    url: endpoint + '/xuat',
+    snapshotId: controller.getSnapshotId()
   }));
+  const controller = ListQuery.create({
+    defaults: { sort: defaultSort }, load: ListQuery.loadFrom(endpoint), onChange: render
+  });
+
+  function syncSortControls() {
+    if (extraSort.value === mainSort.value) extraSort.value = '';
+    for (const option of extraSort.options) option.disabled = option.value === mainSort.value;
+    extraDirection.disabled = !extraSort.value;
+  }
+
+  function writeDraft(draft) {
+    for (const field of filters) {
+      const value = draft[field.name];
+      if (field.multiple) {
+        for (const option of field.options) option.selected = value?.includes(option.value) ?? false;
+      } else {
+        field.value = value ?? '';
+      }
+    }
+    const [main, extra = ''] = (draft.sort || defaultSort).split(',');
+    [mainSort.value, mainDirection.value] = main.split(':');
+    [extraSort.value, extraDirection.value = 'asc'] = extra.split(':');
+    syncSortControls();
+  }
+
+  function readDraft() {
+    const values = Object.fromEntries(filters.map(field => [field.name, field.multiple
+      ? Array.from(field.selectedOptions, option => option.value) : field.value.trim()]));
+    const order = [`${mainSort.value}:${mainDirection.value}`];
+    if (extraSort.value) order.push(`${extraSort.value}:${extraDirection.value}`);
+    return { ...values, sort: order.join(',') };
+  }
+
+  function conditionLabel(name, value) {
+    if (name === 'sort') {
+      return 'Sắp xếp · ' + value.split(',').map(order => {
+        const [field, direction] = order.split(':');
+        const text = Array.from(mainSort.options).find(option => option.value === field)?.text ?? field;
+        return text + (direction === 'asc' ? ' tăng' : ' giảm');
+      }).join(', rồi ');
+    }
+    const field = filters.find(field => field.name === name);
+    const text = field?.multiple
+      ? Array.from(field.options).find(option => option.value === value)?.text ?? value : value;
+    return `${labels[name]} · ${text}`;
+  }
+
+  function renderConditions(applied) {
+    chips.replaceChildren();
+    for (const [name, values] of Object.entries(applied)) {
+      if (!values || (name === 'sort' && values === defaultSort)) continue;
+      for (const value of Array.isArray(values) ? values : [values]) {
+        const text = conditionLabel(name, value);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn btn-outline-secondary btn-sm catalog-condition';
+        button.textContent = text + ' ×';
+        button.setAttribute('aria-label', 'Bỏ điều kiện ' + text);
+        button.addEventListener('click', () => {
+          controller.setDraft(readDraft());
+          controller.remove(name, value);
+          writeDraft(controller.getState().draft);
+          filterForm.querySelector('button[type="submit"]').focus();
+        });
+        const item = document.createElement('li');
+        item.append(button);
+        chips.append(item);
+      }
+    }
+    chips.hidden = !chips.children.length;
+  }
 
   function showMessage(text, error = false) {
     message.textContent = text;
@@ -70,19 +178,35 @@ function makeCatalog({ id, key, label, filters, matches, cells, sheet, onLoad })
     cell.textContent = text;
   }
 
-  function render() {
-    const visible = rows.filter(matches);
-    enableExport(visible.length);
-    count.textContent = visible.length + ' ' + label;
+  function render(state) {
+    const ready = state.status === 'ready';
+    enableExport(ready && Boolean(state.snapshotId));
+    renderConditions(state.applied);
+    count.textContent = ready || state.status === 'empty' ? `${state.total} ${label}` : '';
+    table.setAttribute('aria-busy', String(state.status === 'loading'));
+    const pages = Math.ceil(state.total / state.pageSize);
+    pagination.hidden = pages <= 1;
+    previous.disabled = !ready || state.page <= 1;
+    next.disabled = !ready || state.page >= pages;
+    pagePosition.textContent = pages > 1 ? `Trang ${state.page} / ${pages}` : '';
+
     body.replaceChildren();
-    if (!visible.length) emptyTable('Không tìm thấy ' + label + '.');
-    for (const item of visible) {
+    if (state.status === 'loading') emptyTable(`Đang tải ${label}…`);
+    if (state.status === 'empty') emptyTable(`Không tìm thấy ${label} phù hợp.`);
+    if (state.status === 'error') {
+      if (state.error.status === 401) location.replace('dang-nhap.html');
+      emptyTable(state.error.message);
+    }
+    if (!ready) return;
+
+    for (const item of state.items) {
       const row = body.insertRow();
       row.classList.toggle('is-selected', item[key] === selected);
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'customer-selector';
       button.textContent = item[key];
+      button.setAttribute('aria-pressed', String(item[key] === selected));
       button.addEventListener('click', () => {
         if (fieldset.disabled) return;
         select(item);
@@ -104,49 +228,36 @@ function makeCatalog({ id, key, label, filters, matches, cells, sheet, onLoad })
     save.textContent = selected ? 'Lưu thay đổi' : 'Thêm';
     for (const row of body.rows) {
       const button = row.querySelector('button');
-      row.classList.toggle('is-selected', Boolean(button && button.textContent === selected));
+      const active = Boolean(button && button.textContent === selected);
+      row.classList.toggle('is-selected', active);
+      button?.setAttribute('aria-pressed', String(active));
     }
     showMessage('');
   }
 
-  async function load() {
-    try {
-      rows = await request(endpoint);
-    } catch (error) {
-      if (!rows.length) {
-        body.replaceChildren();
-        emptyTable('Không thể tải danh sách ' + label + '.');
-      }
-      throw error;
-    }
-    onLoad?.(rows);
-    render();
-  }
-
   async function mutate(method, values) {
+    if (fieldset.disabled) return;
+    saving = true;
     fieldset.disabled = true;
     showMessage('');
     try {
       const path = selected ? endpoint + '/' + encodeURIComponent(selected) : endpoint;
       const result = await request(path, method, values);
-      const savedCode = values?.[key];
-      select();
-      try {
-        await load();
-        if (savedCode) select(rows.find(item => item[key] === savedCode));
-        showMessage(result.message);
-      } catch {
-        showMessage(result.message + ' Tải lại trang để cập nhật danh sách.', true);
-      }
+      select(values);
+      const [state] = await Promise.all([controller.refresh(), onMutation?.()]);
+      const refreshFailed = state?.status === 'error';
+      showMessage(refreshFailed ? result.message + ' Hãy bấm Tải lại để cập nhật danh sách.' : result.message, refreshFailed);
     } catch (error) {
       showMessage(error.message, true);
     } finally {
+      saving = false;
       fieldset.disabled = false;
     }
   }
 
   form.addEventListener('submit', event => {
     event.preventDefault();
+    if (fieldset.disabled) return;
     const data = Object.fromEntries(new FormData(form));
     for (const name of Object.keys(data)) data[name] = data[name].trim();
     mutate(selected ? 'PUT' : 'POST', data);
@@ -158,38 +269,50 @@ function makeCatalog({ id, key, label, filters, matches, cells, sheet, onLoad })
     select();
     code.focus();
   });
-  for (const filter of filters) byId(filter).addEventListener('input', render);
+  mainSort.addEventListener('change', syncSortControls);
+  extraSort.addEventListener('change', syncSortControls);
+  filterForm.addEventListener('submit', event => {
+    event.preventDefault();
+    controller.setDraft(readDraft());
+    controller.apply();
+  });
+  filterForm.querySelector('[data-query-reset]').addEventListener('click', () => {
+    controller.reset();
+    writeDraft(controller.getState().draft);
+  });
+  filterForm.querySelector('[data-query-refresh]').addEventListener('click', () => {
+    controller.refresh();
+    refreshOptions();
+  });
+  previous.addEventListener('click', () => controller.goToPage(controller.getState().page - 1));
+  next.addEventListener('click', () => controller.goToPage(controller.getState().page + 1));
+  writeDraft(controller.getState().draft);
 
-  return { load, render, enable: () => { fieldset.disabled = false; } };
+  return {
+    load: controller.refresh,
+    enableQuery: () => { filterForm.querySelector('fieldset').disabled = false; },
+    enableEditor: () => { if (!saving) fieldset.disabled = false; },
+    refreshConditions: () => renderConditions(controller.getState().applied)
+  };
 }
 
 const movieCatalog = makeCatalog({
   id: 'phim',
   key: 'MaPhim',
   label: 'phim',
-  filters: ['movie-search', 'genre-filter'],
-  matches: movie => normalize(movie.MaPhim + ' ' + movie.TenPhim).includes(normalize(byId('movie-search').value.trim()))
-    && (!byId('genre-filter').value || movie.TheLoai === byId('genre-filter').value),
+  defaultSort: 'maPhim:asc',
+  labels: { q: 'Từ khóa', maPhim: 'Mã phim', tenPhim: 'Tên phim', daoDien: 'Đạo diễn',
+    theLoai: 'Thể loại', tuNgay: 'Khởi chiếu từ', denNgay: 'Khởi chiếu đến',
+    phutMin: 'Số phút từ', phutMax: 'Số phút đến', tuoiToiDa: 'Độ tuổi tối thiểu không quá' },
   cells: movie => [movie.TenPhim, movie.TheLoai, movie.DaoDien || '—', movie.ThoiLuong + ' phút',
     formatDate(movie.NgayKhoiChieu), movie.DoTuoiChoPhep === 0 ? 'P' : 'T' + movie.DoTuoiChoPhep],
-  sheet: {
-    name: 'Phim',
-    columns: [['Mã phim', 16], ['Tên phim', 36], ['Thể loại', 20], ['Đạo diễn', 26],
-      ['Thời lượng (phút)', 20, ExcelExport.integer], ['Ngày khởi chiếu', 19, ExcelExport.date],
-      ['Độ tuổi tối thiểu', 19, ExcelExport.integer]],
-    row: movie => [movie.MaPhim, movie.TenPhim, movie.TheLoai, movie.DaoDien, movie.ThoiLuong,
-      ExcelExport.asDate(movie.NgayKhoiChieu), movie.DoTuoiChoPhep]
-  },
-  onLoad: rows => {
-    syncMovies(rows);
-    showtimeCatalog.render();
-  }
+  onMutation: refreshOptions
 });
 
 function showtimeCatalogCells(show) {
   return [
-    movies.find(movie => movie.MaPhim === show.MaPhim)?.TenPhim ?? show.MaPhim,
-    rooms.find(room => room.MaPhong === show.MaPhong)?.TenPhong ?? show.MaPhong,
+    show.TenPhim ?? show.MaPhim,
+    show.TenPhong ?? show.MaPhong,
     formatDate(show.NgayChieu), show.GioBatDau,
     show.GioKetThuc + (show.GioKetThuc < show.GioBatDau ? ' (+1 ngày)' : ''),
     money.format(show.GiaVe), statusLabels[show.TrangThai] ?? show.TrangThai
@@ -200,20 +323,11 @@ const showtimeCatalog = makeCatalog({
   id: 'suat-chieu',
   key: 'MaSuatChieu',
   label: 'suất chiếu',
-  filters: ['movie-filter', 'date-filter'],
-  matches: show => (!byId('movie-filter').value || show.MaPhim === byId('movie-filter').value)
-    && (!byId('date-filter').value || show.NgayChieu === byId('date-filter').value),
-  cells: showtimeCatalogCells,
-  sheet: {
-    name: 'Suất chiếu',
-    columns: [['Mã suất', 18], ['Phim', 36], ['Phòng', 24], ['Ngày chiếu', 17, ExcelExport.date],
-      ['Bắt đầu', 14], ['Kết thúc', 23], ['Giá vé', 18, ExcelExport.money], ['Trạng thái', 18]],
-    row: show => {
-      const display = showtimeCatalogCells(show);
-      return [show.MaSuatChieu, ...display.slice(0, 2), ExcelExport.asDate(show.NgayChieu),
-        ...display.slice(3, 5), Number(show.GiaVe), display[6]];
-    }
-  }
+  defaultSort: 'lich:asc',
+  labels: { q: 'Từ khóa', maSuatChieu: 'Mã suất', tenPhim: 'Tên phim', tenPhong: 'Tên phòng',
+    maPhim: 'Phim', maPhong: 'Phòng', trangThai: 'Trạng thái', tuNgay: 'Chiếu từ', denNgay: 'Chiếu đến',
+    gioTu: 'Bắt đầu từ giờ', gioDen: 'Bắt đầu đến giờ', giaMin: 'Giá vé từ', giaMax: 'Giá vé đến' },
+  cells: showtimeCatalogCells
 });
 
 function suggestEnd() {
@@ -256,21 +370,14 @@ async function initialize() {
     window.authToast.showPending();
     byId('account-name').textContent = account.HoTen || account.TenDangNhap;
     byId('logout-button').hidden = false;
-    const results = await Promise.allSettled([
-      movieCatalog.load().then(movieCatalog.enable),
+    movieCatalog.enableQuery();
+    movieCatalog.enableEditor();
+    showtimeCatalog.enableQuery();
+    await Promise.all([
+      movieCatalog.load(),
       showtimeCatalog.load(),
-      request('/api/phong-chieu').then(result => {
-        rooms = result;
-        setOptions(byId('MaPhong'), rooms.map(room => [room.MaPhong, room.TenPhong + ' (' + room.MaPhong + ')']));
-      })
+      refreshOptions()
     ]);
-    if (results.every(result => result.status === 'fulfilled')) {
-      showtimeCatalog.render();
-      showtimeCatalog.enable();
-    } else {
-      const error = results.find(result => result.status === 'rejected');
-      byId('page-error').textContent = error.reason.message;
-    }
   } catch (error) {
     byId('page-error').textContent = error.message;
   }

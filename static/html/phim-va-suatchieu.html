@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="../css/rap-chieu-phim.css">
     <link rel="stylesheet" href="../css/phim-va-suatchieu.css">
     <script defer src="../js/auth-toast.js"></script>
+    <script defer src="../js/truy-van-danh-sach.js"></script>
     <script defer src="../js/xuat-excel.js"></script>
     <script defer src="../js/phim-va-suat-chieu.js"></script>
   </head>
@@ -46,16 +47,55 @@
                 <span class="small d-block" id="phim-export-message" role="status"></span>
               </div>
             </div>
-            <div class="catalog-filters mb-3">
-              <div><label class="form-label" for="movie-search">Mã hoặc tên phim</label><input class="form-control" id="movie-search" type="search"></div>
-              <div><label class="form-label" for="genre-filter">Thể loại</label><select class="form-select" id="genre-filter"><option value="">Tất cả thể loại</option></select></div>
-            </div>
+            <form id="phim-filter-form" class="catalog-query mb-3" data-query-form>
+              <fieldset disabled aria-label="Điều kiện danh sách phim">
+                <div class="catalog-filters">
+                  <label>Mã hoặc tên phim<input class="form-control" id="movie-search" name="q" type="search" maxlength="100"></label>
+                  <label>Thể loại<select class="form-select" id="genre-filter" name="theLoai" multiple size="3" aria-describedby="genre-help"></select></label>
+                </div>
+                <p class="catalog-help" id="genre-help">Giữ Ctrl hoặc ⌘ để chọn nhiều thể loại.</p>
+                <details class="catalog-advanced">
+                  <summary>Tìm nâng cao</summary>
+                  <div class="catalog-filters">
+                    <label>Mã phim chính xác<input class="form-control" name="maPhim" maxlength="15"></label>
+                    <label>Tên phim<input class="form-control" name="tenPhim" maxlength="150"></label>
+                    <label>Đạo diễn<input class="form-control" name="daoDien" maxlength="100"></label>
+                    <label>Khởi chiếu từ ngày<input class="form-control" name="tuNgay" type="date"></label>
+                    <label>Khởi chiếu đến ngày<input class="form-control" name="denNgay" type="date"></label>
+                    <label>Số phút từ<input class="form-control" name="phutMin" type="number" min="1" max="2147483647"></label>
+                    <label>Số phút đến<input class="form-control" name="phutMax" type="number" min="1" max="2147483647"></label>
+                    <label>Độ tuổi tối thiểu không quá<input class="form-control" name="tuoiToiDa" type="number" min="0" max="2147483647"></label>
+                  </div>
+                </details>
+                <div class="catalog-filters catalog-order">
+                  <label>Sắp xếp theo
+                    <select class="form-select" data-sort-main>
+                      <option value="maPhim">Mã phim</option><option value="tenPhim">Tên phim</option><option value="ngayKhoiChieu">Ngày khởi chiếu</option><option value="thoiLuong">Thời lượng</option><option value="doTuoi">Độ tuổi</option>
+                    </select>
+                  </label>
+                  <label>Chiều chính<select class="form-select" data-sort-main-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                  <label>Tiêu chí phụ<select class="form-select" data-sort-extra><option value="">Không chọn</option></select></label>
+                  <label>Chiều phụ<select class="form-select" data-sort-extra-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                </div>
+                <div class="catalog-actions">
+                  <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
+                </div>
+                <ul class="catalog-conditions" data-query-conditions aria-label="Điều kiện đang áp dụng" hidden></ul>
+              </fieldset>
+            </form>
             <div class="table-responsive">
               <table class="table align-middle customer-table mb-0" aria-labelledby="phim-list">
                 <thead><tr><th scope="col">Mã phim</th><th scope="col">Tên phim</th><th scope="col">Thể loại</th><th scope="col">Đạo diễn</th><th scope="col">Thời lượng</th><th scope="col">Khởi chiếu</th><th scope="col">Độ tuổi</th></tr></thead>
                 <tbody><tr><td colspan="7">Đang tải dữ liệu…</td></tr></tbody>
               </table>
             </div>
+            <nav class="catalog-pagination mt-3" data-query-pagination aria-label="Phân trang danh sách phim" hidden>
+              <button class="btn btn-outline-secondary btn-sm" type="button" data-page-prev>Trang trước</button>
+              <span class="small" data-page-position role="status"></span>
+              <button class="btn btn-outline-secondary btn-sm" type="button" data-page-next>Trang sau</button>
+            </nav>
           </section>
           <section class="panel" aria-labelledby="phim-detail">
             <h2 id="phim-detail">Thông tin phim</h2>
@@ -99,16 +139,64 @@
                 <span class="small d-block" id="suat-chieu-export-message" role="status"></span>
               </div>
             </div>
-            <div class="catalog-filters mb-3">
-              <div><label class="form-label" for="movie-filter">Phim</label><select class="form-select" id="movie-filter"><option value="">Tất cả phim</option></select></div>
-              <div><label class="form-label" for="date-filter">Ngày chiếu</label><input class="form-control" id="date-filter" type="date"></div>
-            </div>
+            <form id="suat-chieu-filter-form" class="catalog-query mb-3" data-query-form>
+              <fieldset disabled aria-label="Điều kiện danh sách suất chiếu">
+                <div class="catalog-filters">
+                  <label>Mã suất, tên phim hoặc phòng<input class="form-control" id="showtime-search" name="q" type="search" maxlength="100"></label>
+                  <label>Chiếu từ ngày<input class="form-control" id="date-filter" name="tuNgay" type="date"></label>
+                  <label>Chiếu đến ngày<input class="form-control" name="denNgay" type="date"></label>
+                </div>
+                <details class="catalog-advanced">
+                  <summary>Tìm nâng cao</summary>
+                  <div class="catalog-filters">
+                    <label>Mã suất chính xác<input class="form-control" name="maSuatChieu" maxlength="20"></label>
+                    <label>Tên phim<input class="form-control" name="tenPhim" maxlength="150"></label>
+                    <label>Tên phòng<input class="form-control" name="tenPhong" maxlength="50"></label>
+                    <label>Phim<select class="form-select" id="movie-filter" name="maPhim" multiple size="3" aria-describedby="showtime-multi-help"></select></label>
+                    <label>Phòng<select class="form-select" id="room-filter" name="maPhong" multiple size="3" aria-describedby="showtime-multi-help"></select></label>
+                    <label>Trạng thái
+                      <select class="form-select" name="trangThai" multiple size="3" aria-describedby="showtime-multi-help">
+                        <option value="SapChieu">Sắp chiếu</option><option value="DangChieu">Đang chiếu</option><option value="KetThuc">Kết thúc</option><option value="Huy">Hủy</option>
+                      </select>
+                    </label>
+                  </div>
+                  <p class="catalog-help" id="showtime-multi-help">Giữ Ctrl hoặc ⌘ để chọn nhiều phim, phòng hoặc trạng thái.</p>
+                  <div class="catalog-filters">
+                    <label>Bắt đầu từ giờ<input class="form-control" name="gioTu" type="time" step="1"></label>
+                    <label>Bắt đầu đến giờ<input class="form-control" name="gioDen" type="time" step="1"></label>
+                    <label>Giá vé từ (₫)<input class="form-control" name="giaMin" type="number" min="0" step="0.01"></label>
+                    <label>Giá vé đến (₫)<input class="form-control" name="giaMax" type="number" min="0" step="0.01"></label>
+                  </div>
+                </details>
+                <div class="catalog-filters catalog-order">
+                  <label>Sắp xếp theo
+                    <select class="form-select" data-sort-main>
+                      <option value="lich">Lịch chiếu</option><option value="phong">Phòng</option><option value="phim">Phim</option><option value="giaVe">Giá vé</option><option value="maSuatChieu">Mã suất</option>
+                    </select>
+                  </label>
+                  <label>Chiều chính<select class="form-select" data-sort-main-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                  <label>Tiêu chí phụ<select class="form-select" data-sort-extra><option value="">Không chọn</option></select></label>
+                  <label>Chiều phụ<select class="form-select" data-sort-extra-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                </div>
+                <div class="catalog-actions">
+                  <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
+                </div>
+                <ul class="catalog-conditions" data-query-conditions aria-label="Điều kiện đang áp dụng" hidden></ul>
+              </fieldset>
+            </form>
             <div class="table-responsive">
               <table class="table align-middle customer-table mb-0" aria-labelledby="suat-chieu-list">
                 <thead><tr><th scope="col">Mã suất</th><th scope="col">Phim</th><th scope="col">Phòng</th><th scope="col">Ngày chiếu</th><th scope="col">Bắt đầu</th><th scope="col">Kết thúc</th><th scope="col">Giá vé</th><th scope="col">Trạng thái</th></tr></thead>
                 <tbody><tr><td colspan="8">Đang tải dữ liệu…</td></tr></tbody>
               </table>
             </div>
+            <nav class="catalog-pagination mt-3" data-query-pagination aria-label="Phân trang danh sách suất chiếu" hidden>
+              <button class="btn btn-outline-secondary btn-sm" type="button" data-page-prev>Trang trước</button>
+              <span class="small" data-page-position role="status"></span>
+              <button class="btn btn-outline-secondary btn-sm" type="button" data-page-next>Trang sau</button>
+            </nav>
           </section>
           <section class="panel" aria-labelledby="suat-chieu-detail">
             <h2 id="suat-chieu-detail">Thông tin suất chiếu</h2>

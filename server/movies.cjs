@@ -2,6 +2,9 @@
 const express = require('express');
 const db = require('./db.cjs');
 const { requireLogin } = require('./auth.cjs');
+const { normalizeSearchText, vietnameseSearchColumn } = require('./list-query.cjs');
+const { createSnapshotList } = require('./snapshot-list.cjs');
+const store = require('./snapshot-store.cjs');
 
 const router = express.Router();
 router.use(requireLogin);
@@ -60,26 +63,91 @@ function validateMovie(body = {}) {
 
     return movie;
 }
-// -------------------- LẤY DANH SÁCH PHIM --------------------
-router.get('/', async (_req, res, next) => {
-    try {
-        const [rows] = await db.execute(`
-            SELECT
-                MaPhim,
-                TenPhim,
-                TheLoai,
-                DaoDien,
-                ThoiLuong,
-                DATE_FORMAT(NgayKhoiChieu, '%Y-%m-%d') AS NgayKhoiChieu,
-                DoTuoiChoPhep
-            FROM Phim
-            ORDER BY MaPhim
-        `);
+const titleSearch = vietnameseSearchColumn('p.TenPhim');
 
-        res.json(rows);
-    } catch (error) {
-        next(error);
+function genreLabels(value) {
+    return value.split(',').map(label => label.trim().replace(/\s+/gu, ' ')).filter(Boolean);
+}
+
+const movieList = createSnapshotList({
+    store,
+    pool: db,
+    scope: 'phim',
+    query: {
+        accentInsensitive: true,
+        searchColumns: [vietnameseSearchColumn('p.MaPhim'), titleSearch],
+        filters: {
+            maPhim: { type: 'exact', column: 'p.MaPhim', maxLength: 15 },
+            tenPhim: { type: 'text', column: titleSearch, operator: 'contains', maxLength: 150 },
+            daoDien: { type: 'text', column: vietnameseSearchColumn('p.DaoDien'), operator: 'contains', maxLength: 100 },
+            theLoai: { type: 'text', multiple: true },
+            tuNgay: { type: 'date', column: 'p.NgayKhoiChieu', operator: '>=' },
+            denNgay: { type: 'date', column: 'p.NgayKhoiChieu', operator: '<=' },
+            phutMin: { type: 'integer', column: 'p.ThoiLuong', operator: '>=', min: 1, max: 2147483647 },
+            phutMax: { type: 'integer', column: 'p.ThoiLuong', operator: '<=', min: 1, max: 2147483647 },
+            tuoiToiDa: { type: 'integer', column: 'p.DoTuoiChoPhep', operator: '<=', max: 2147483647 }
+        },
+        ranges: [['tuNgay', 'denNgay'], ['phutMin', 'phutMax']],
+        sort: {
+            maPhim: 'p.MaPhim',
+            tenPhim: 'CONVERT(p.TenPhim USING utf8mb4) COLLATE utf8mb4_vi_0900_ai_ci',
+            ngayKhoiChieu: 'p.NgayKhoiChieu',
+            thoiLuong: 'p.ThoiLuong',
+            doTuoi: 'p.DoTuoiChoPhep'
+        },
+        defaultSort: 'maPhim:asc',
+        tieBreakers: ['p.MaPhim']
+    },
+    async load(connection, { filters, conditions, params, orderBy }) {
+        const [items] = await connection.execute(`
+            SELECT p.MaPhim, p.TenPhim, p.TheLoai, p.DaoDien, p.ThoiLuong,
+                   DATE_FORMAT(p.NgayKhoiChieu, '%Y-%m-%d') AS NgayKhoiChieu, p.DoTuoiChoPhep
+            FROM Phim p
+            ${conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''}
+            ORDER BY ${orderBy}
+        `, params);
+        if (!filters.theLoai) return { items };
+        const selected = new Set(filters.theLoai);
+        // Use the same label normalization as /tuy-chon before creating the snapshot.
+        return { items: items.filter(movie => genreLabels(movie.TheLoai)
+            .some(label => selected.has(normalizeSearchText(label)))) };
+    },
+    workbook({ items }) {
+        const integer = '#,##0';
+        return {
+            filename: 'phim',
+            sheets: [{
+                name: 'Phim',
+                columns: [['Mã phim', 16], ['Tên phim', 36], ['Thể loại', 20], ['Đạo diễn', 26],
+                    ['Thời lượng (phút)', 20, integer], ['Ngày khởi chiếu', 19, 'dd/mm/yyyy'],
+                    ['Độ tuổi tối thiểu', 19, integer]],
+                rows: items.map(movie => [movie.MaPhim, movie.TenPhim, movie.TheLoai, movie.DaoDien,
+                    movie.ThoiLuong, new Date(movie.NgayKhoiChieu + 'T00:00:00Z'), movie.DoTuoiChoPhep])
+            }]
+        };
     }
+});
+
+router.get('/', movieList.list);
+router.get('/xuat', movieList.exportXlsx);
+
+router.get('/tuy-chon', async (_req, res) => {
+    const [rows] = await db.execute(`
+        SELECT MaPhim, TenPhim, ThoiLuong, TheLoai
+        FROM Phim
+        ORDER BY MaPhim
+    `);
+    const genres = new Map();
+    const phim = rows.map(({ TheLoai, ...movie }) => {
+        for (const label of genreLabels(TheLoai)) {
+            const value = normalizeSearchText(label);
+            if (value && !genres.has(value)) genres.set(value, { value, label });
+        }
+        return movie;
+    });
+    const collator = new Intl.Collator('vi');
+    const theLoai = Array.from(genres.values()).sort((a, b) => collator.compare(a.label, b.label));
+    res.json({ phim, theLoai });
 });
 // -------------------- THEM PHIM --------------------
 router.post('/', async (req, res, next) => {

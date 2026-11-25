@@ -100,6 +100,11 @@ router.get('/', async (_req, res) => {
   res.json(rooms);
 });
 
+router.get('/tuy-chon', async (_req, res) => {
+  const [rooms] = await db.execute('SELECT MaPhong, TenPhong FROM PhongChieu ORDER BY MaPhong');
+  res.json(rooms);
+});
+
 router.post('/', async (req, res) => {
   const code = trimmed(req.body?.MaPhong).toUpperCase();
   const count = req.body?.SoGhe;

@@ -23,7 +23,8 @@ function vietnameseSearchColumn(column) {
   let folded = `REPLACE(LOWER(CONVERT(${column} USING utf8mb4)) COLLATE utf8mb4_0900_as_cs, 'đ', 'd')`;
   for (const [letter, marks] of accents) folded = `REGEXP_REPLACE(${folded}, '[${marks}]', '${letter}')`;
   folded = `REGEXP_REPLACE(${folded}, CONCAT(CHAR(92 USING utf8mb4), 'p{M}'), '')`;
-  return `TRIM(REGEXP_REPLACE(${folded}, '[[:space:]]+', ' '))`;
+  const whitespace = '[\u0009-\u000d \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]+';
+  return `TRIM(REGEXP_REPLACE(${folded}, '${whitespace}', ' '))`;
 }
 
 function scalar(value, field, maxLength) {
@@ -100,14 +101,18 @@ function filterValues(raw, field, filter) {
     .filter(value => value !== '')));
 }
 
-function contains(column) {
+function contains(column, accentInsensitive) {
+  if (accentInsensitive) {
+    return `CONVERT(${column} USING utf8mb4) COLLATE utf8mb4_0900_ai_ci LIKE
+      CONCAT('%', REPLACE(REPLACE(REPLACE(?, '!', '!!'), '%', '!%'), '_', '!_'), '%') ESCAPE '!'`;
+  }
   return `LOCATE(CAST(? AS BINARY), CAST(${column} AS BINARY)) > 0`;
 }
 
-function predicate(filter, values) {
+function predicate(filter, values, accentInsensitive) {
   const { column } = filter;
   switch (filter.operator ?? '=') {
-    case 'contains': return values.map(() => contains(column)).join(' OR ');
+    case 'contains': return values.map(() => contains(column, accentInsensitive)).join(' OR ');
     case '=':
       return values.length === 1 ? `${column} = ?` : `${column} IN (${values.map(() => '?').join(', ')})`;
     case '>=': return `${column} >= ?`;
@@ -146,11 +151,12 @@ function orderBy(raw, options) {
   return Array.from(order, ([column, direction]) => `${column} ${direction}`).join(', ');
 }
 
-// SQL expressions in the options are supplied by the route. Columns used for text
-// searches must contain the same normalization as the input (including spaces and đ).
+// SQL expressions in the options are supplied by the route. Text columns use
+// the same space and đ folding as the input. The optional accent-insensitive
+// comparison also handles precomposed foreign accents in existing records.
 // A filter without a column is parsed for a route-specific predicate, e.g. EXISTS.
 function parseListQuery(query, options) {
-  const { searchColumns = [], phoneColumn, filters = {}, ranges = [] } = options;
+  const { searchColumns = [], phoneColumn, filters = {}, ranges = [], accentInsensitive = false } = options;
   const columns = phoneColumn ? [...searchColumns, phoneColumn] : searchColumns;
   const keyword = normalizeSearchText(scalar(query.q, 'q', 100));
   if (keyword && !columns.length) throw new ListQueryError('q');
@@ -161,11 +167,11 @@ function parseListQuery(query, options) {
   const parsedFilters = Object.create(null);
   const keywordClauses = [];
   for (const term of terms) {
-    keywordClauses.push(`(${columns.map(contains).join(' OR ')})`);
+    keywordClauses.push(`(${columns.map(column => contains(column, accentInsensitive)).join(' OR ')})`);
     params.push(...columns.map(() => term));
   }
   if (phoneColumn && digits !== keyword && /^\d{8,15}$/.test(digits)) {
-    conditions.push(`((${keywordClauses.join(' AND ')}) OR ${contains(phoneColumn)})`);
+    conditions.push(`((${keywordClauses.join(' AND ')}) OR ${contains(phoneColumn, accentInsensitive)})`);
     params.push(digits);
   } else {
     conditions.push(...keywordClauses);
@@ -181,7 +187,7 @@ function parseListQuery(query, options) {
     if (filter.multiple && filter.operator && !['=', 'contains'].includes(filter.operator)) {
       throw new TypeError(`Unsupported operator for multiple values of ${field}`);
     }
-    conditions.push(`(${predicate(filter, values)})`);
+    conditions.push(`(${predicate(filter, values, accentInsensitive)})`);
     if (filter.operator !== 'throughDate' || values[0] !== '9999-12-31') params.push(...values);
   }
   for (const [from, to] of ranges) {

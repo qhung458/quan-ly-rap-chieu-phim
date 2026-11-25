@@ -2,8 +2,13 @@
 const express = require('express');
 const db = require('./db.cjs');
 const { requireLogin } = require('./auth.cjs');
+const { vietnameseSearchColumn } = require('./list-query.cjs');
+const { createSnapshotList } = require('./snapshot-list.cjs');
+const snapshotStore = require('./snapshot-store.cjs');
 
 const router = express.Router();
+const statusLabels = { SapChieu: 'Sắp chiếu', DangChieu: 'Đang chiếu', KetThuc: 'Kết thúc', Huy: 'Hủy' };
+const allowedStatuses = Object.keys(statusLabels);
 router.use(requireLogin);
 // -------------------- KIỂM TRA DỮ LIỆU --------------------
 class ShowtimeError extends Error {
@@ -73,8 +78,6 @@ function validateShowtime(body = {}, maSuatChieu = null) {
         throw new ShowtimeError(400, 'Giá vé phải từ 0 và nằm trong giới hạn cho phép.');
     }
 
-    const allowedStatuses = ['SapChieu', 'DangChieu', 'KetThuc', 'Huy'];
-
     if (!allowedStatuses.includes(item.TrangThai)) {
         throw new ShowtimeError(400, 'Trạng thái suất chiếu không hợp lệ.');
     }
@@ -142,28 +145,80 @@ async function checkRoomConflict(item, excludeId = null) {
         throw new ShowtimeError(409, 'Phòng chiếu đã có suất chiếu trùng thời gian.');
     }
 }
-// -------------------- LẤY DANH SÁCH SUẤT CHIẾU --------------------
-router.get('/', async (_req, res, next) => {
-    try {
-        const [rows] = await db.execute(`
-            SELECT
-                MaSuatChieu,
-                MaPhim,
-                MaPhong,
-                DATE_FORMAT(NgayChieu, '%Y-%m-%d') AS NgayChieu,
-                TIME_FORMAT(GioBatDau, '%H:%i:%s') AS GioBatDau,
-                TIME_FORMAT(GioKetThuc, '%H:%i:%s') AS GioKetThuc,
-                GiaVe,
-                TrangThai
-            FROM SuatChieu
-            ORDER BY NgayChieu, GioBatDau
-        `);
+const movieNameSearch = vietnameseSearchColumn('p.TenPhim');
+const roomNameSearch = vietnameseSearchColumn('r.TenPhong');
 
-        res.json(rows);
-    } catch (error) {
-        next(error);
-    }
+const showtimeList = createSnapshotList({
+    store: snapshotStore,
+    pool: db,
+    scope: 'suat-chieu',
+    query: {
+        accentInsensitive: true,
+        searchColumns: [vietnameseSearchColumn('s.MaSuatChieu'), movieNameSearch, roomNameSearch],
+        filters: {
+            maSuatChieu: { type: 'exact', column: 's.MaSuatChieu', maxLength: 20 },
+            tenPhim: { type: 'text', column: movieNameSearch, operator: 'contains', maxLength: 150 },
+            tenPhong: { type: 'text', column: roomNameSearch, operator: 'contains', maxLength: 50 },
+            maPhim: { type: 'exact', column: 's.MaPhim', maxLength: 15, multiple: true },
+            maPhong: { type: 'exact', column: 's.MaPhong', maxLength: 10, multiple: true },
+            trangThai: { type: 'enum', column: 's.TrangThai', values: allowedStatuses, multiple: true },
+            tuNgay: { type: 'date', column: 's.NgayChieu', operator: '>=' },
+            denNgay: { type: 'date', column: 's.NgayChieu', operator: '<=' },
+            gioTu: { type: 'time', column: 's.GioBatDau', operator: '>=' },
+            gioDen: { type: 'time', column: 's.GioBatDau', operator: '<=' },
+            giaMin: { type: 'decimal' },
+            giaMax: { type: 'decimal' }
+        },
+        ranges: [['tuNgay', 'denNgay'], ['gioTu', 'gioDen'], ['giaMin', 'giaMax']],
+        sort: {
+            lich: ['s.NgayChieu', 's.GioBatDau'],
+            phong: 'CONVERT(r.TenPhong USING utf8mb4) COLLATE utf8mb4_vi_0900_ai_ci',
+            phim: 'CONVERT(p.TenPhim USING utf8mb4) COLLATE utf8mb4_vi_0900_ai_ci',
+            giaVe: 's.GiaVe',
+            maSuatChieu: 's.MaSuatChieu'
+        },
+        defaultSort: 'lich:asc',
+        tieBreakers: ['s.MaSuatChieu']
+    },
+    async load(connection, { filters, conditions, params, orderBy }) {
+        if (filters.giaMin !== undefined) {
+            conditions.push('s.GiaVe >= CAST(? AS DECIMAL(18,2))');
+            params.push(filters.giaMin);
+        }
+        if (filters.giaMax !== undefined) {
+            conditions.push('s.GiaVe <= CAST(? AS DECIMAL(18,2))');
+            params.push(filters.giaMax);
+        }
+        const [items] = await connection.execute(`
+            SELECT s.MaSuatChieu, s.MaPhim, p.TenPhim, s.MaPhong, r.TenPhong,
+                DATE_FORMAT(s.NgayChieu, '%Y-%m-%d') AS NgayChieu,
+                TIME_FORMAT(s.GioBatDau, '%H:%i:%s') AS GioBatDau,
+                TIME_FORMAT(s.GioKetThuc, '%H:%i:%s') AS GioKetThuc,
+                s.GiaVe, s.TrangThai
+            FROM SuatChieu s
+            JOIN Phim p ON p.MaPhim = s.MaPhim
+            JOIN PhongChieu r ON r.MaPhong = s.MaPhong
+            ${conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''}
+            ORDER BY ${orderBy}
+        `, params);
+        return { items };
+    },
+    workbook: ({ items }) => ({
+        filename: 'suat-chieu',
+        sheets: [{
+            name: 'Suất chiếu',
+            columns: [['Mã suất', 18], ['Phim', 36], ['Phòng', 24], ['Ngày chiếu', 17, 'dd/mm/yyyy'],
+                ['Bắt đầu', 14], ['Kết thúc', 23], ['Giá vé', 18, '#,##0.##" ₫"'], ['Trạng thái', 18]],
+            rows: items.map(show => [
+                show.MaSuatChieu, show.TenPhim, show.TenPhong, new Date(show.NgayChieu + 'T00:00:00Z'),
+                show.GioBatDau, show.GioKetThuc + (show.GioKetThuc < show.GioBatDau ? ' (+1 ngày)' : ''),
+                Number(show.GiaVe), statusLabels[show.TrangThai] ?? show.TrangThai
+            ])
+        }]
+    })
 });
+router.get('/', showtimeList.list);
+router.get('/xuat', showtimeList.exportXlsx);
 // -------------------- THÊM SUẤT CHIẾU --------------------
 router.post('/', async (req, res, next) => {
     try {
