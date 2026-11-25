@@ -1,6 +1,9 @@
 const express = require('express');
 const db = require('./db.cjs');
 const { requireLogin, requireAdmin } = require('./auth.cjs');
+const { vietnameseSearchColumn } = require('./list-query.cjs');
+const { createSnapshotList } = require('./snapshot-list.cjs');
+const store = require('./snapshot-store.cjs');
 
 const router = express.Router();
 const codePattern = /^[A-Za-z0-9_-]{1,10}$/;
@@ -37,19 +40,65 @@ function handleDatabaseError(error, res) {
   throw error;
 }
 
-router.get('/', async (req, res) => {
-  const keyword = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
+const comboSales = `COALESCE((
+  SELECT SUM(h.SoLuongCombo) FROM HoaDon h WHERE h.MaCombo = b.MaCombo
+), 0)`;
+
+const comboList = createSnapshotList({
+  store,
+  pool: db,
+  scope: 'bap-nuoc',
+  paginated: false,
+  query: {
+    searchColumns: ['d.MaCombo', 'd.TenCombo', 'd.MoTa'].map(vietnameseSearchColumn),
+    filters: {
+      maCombo: { type: 'exact', column: 'd.MaCombo', maxLength: 10 },
+      ten: { type: 'text', column: vietnameseSearchColumn('d.TenCombo'), operator: 'contains', maxLength: 100 },
+      moTa: { type: 'text', column: vietnameseSearchColumn('d.MoTa'), operator: 'contains', maxLength: 255 },
+      giaMin: { type: 'decimal', column: 'd.GiaCombo', operator: '>=' },
+      giaMax: { type: 'decimal', column: 'd.GiaCombo', operator: '<=' },
+      daBanMin: { type: 'integer', column: 'd.DaBan', operator: '>=' },
+      daBanMax: { type: 'integer', column: 'd.DaBan', operator: '<=' }
+    },
+    ranges: [['giaMin', 'giaMax'], ['daBanMin', 'daBanMax']],
+    sort: { maCombo: 'd.MaCombo', ten: 'd.TenCombo', gia: 'd.GiaCombo', daBan: 'd.DaBan' },
+    defaultSort: 'maCombo:asc',
+    tieBreakers: ['d.MaCombo']
+  },
+  async load(connection, { conditions, params, orderBy }) {
+    const [rows] = await connection.execute(`
+      SELECT d.MaCombo, d.TenCombo, d.GiaCombo, d.MoTa, d.DaBan
+      FROM (
+        SELECT b.MaCombo, b.TenCombo, b.GiaCombo, b.MoTa, ${comboSales} AS DaBan
+        FROM BapNuoc b
+      ) AS d
+      ${conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''}
+      ORDER BY ${orderBy}
+    `, params);
+    return { items: rows.map(mapCombo) };
+  },
+  workbook({ items }) {
+    return {
+      filename: 'danh-muc-combo',
+      sheets: [{
+        name: 'Danh mục combo',
+        columns: [['Mã combo', 16], ['Tên combo', 32], ['Mô tả', 42],
+          ['Giá', 18, '#,##0.##" ₫"'], ['Đã bán', 13, '#,##0']],
+        rows: items.map(({ MaCombo, TenCombo, MoTa, GiaCombo, DaBan }) =>
+          [MaCombo, TenCombo, MoTa, GiaCombo, DaBan])
+      }]
+    };
+  }
+});
+
+router.get('/', comboList.list);
+router.get('/xuat', comboList.exportXlsx);
+
+router.get('/tuy-chon', async (_req, res) => {
   const [rows] = await db.execute(
-    `SELECT b.MaCombo, b.TenCombo, b.GiaCombo, b.MoTa,
-            COALESCE(SUM(h.SoLuongCombo), 0) AS DaBan
-     FROM BapNuoc b
-     LEFT JOIN HoaDon h ON h.MaCombo = b.MaCombo
-     WHERE LOCATE(?, b.MaCombo) > 0 OR LOCATE(?, b.TenCombo) > 0 OR LOCATE(?, b.MoTa) > 0
-     GROUP BY b.MaCombo, b.TenCombo, b.GiaCombo, b.MoTa
-     ORDER BY b.MaCombo`,
-    [keyword, keyword, keyword]
+    'SELECT MaCombo, TenCombo, GiaCombo FROM BapNuoc ORDER BY MaCombo'
   );
-  res.json(rows.map(mapCombo));
+  res.json(rows.map(row => ({ ...row, GiaCombo: Number(row.GiaCombo) })));
 });
 
 router.post('/', async (req, res) => {
@@ -94,8 +143,7 @@ router.put('/:code', async (req, res) => {
     return handleDatabaseError(error, res);
   }
   const [[row]] = await db.execute(
-    `SELECT b.MaCombo, b.TenCombo, b.GiaCombo, b.MoTa,
-            (SELECT COALESCE(SUM(SoLuongCombo), 0) FROM HoaDon WHERE MaCombo = b.MaCombo) AS DaBan
+    `SELECT b.MaCombo, b.TenCombo, b.GiaCombo, b.MoTa, ${comboSales} AS DaBan
      FROM BapNuoc b WHERE b.MaCombo = ?`, [req.params.code]
   );
   res.json(mapCombo(row));

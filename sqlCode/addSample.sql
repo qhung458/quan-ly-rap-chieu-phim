@@ -191,7 +191,8 @@ INSERT INTO SuatChieu (MaSuatChieu, MaPhim, MaPhong, NgayChieu, GioBatDau, GioKe
 
 -- THEM DU LIEU HOA DON VA VE (chay sau Ghe, SuatChieu, KhachHang, BapNuoc)
 -- HOA DON
-INSERT INTO HoaDon (MaHoaDon, MaKhachHang, MaCombo, SoLuongCombo, NgayMua, TongTien) VALUES
+CREATE TEMPORARY TABLE MauHoaDon LIKE HoaDon;
+INSERT INTO MauHoaDon (MaHoaDon, MaKhachHang, MaCombo, SoLuongCombo, NgayMua, TongTien) VALUES
 ('HD001','KH019','CB04',2,'2026-10-27 09:35:00',398000.00),
 ('HD002','KH016','CB04',2,'2026-10-27 12:31:00',398000.00),
 ('HD003','KH018','CB06',2,'2026-10-27 19:34:00',178000.00),
@@ -260,6 +261,15 @@ INSERT INTO HoaDon (MaHoaDon, MaKhachHang, MaCombo, SoLuongCombo, NgayMua, TongT
 ('HD066','KH016','CB06',1,'2026-11-02 17:55:00',89000.00),
 ('HD067','KH005','CB02',3,'2026-11-03 00:30:00',345000.00),
 ('HD068','KH007','CB05',2,'2026-11-03 06:03:00',158000.00);
+
+INSERT INTO DauHoaDon (MaHoaDon, MaKhachHang, NgayMua)
+SELECT MaHoaDon, MaKhachHang, MIN(NgayMua)
+FROM MauHoaDon
+GROUP BY MaHoaDon, MaKhachHang;
+
+INSERT INTO HoaDon (MaHoaDon, MaKhachHang, MaCombo, SoLuongCombo, NgayMua, TongTien)
+SELECT MaHoaDon, MaKhachHang, MaCombo, SoLuongCombo, NgayMua, TongTien FROM MauHoaDon;
+DROP TEMPORARY TABLE MauHoaDon;
 
 -- VE
 INSERT INTO Ve (MaVe, MaSuatChieu, MaKhachHang, MaGhe, NgayDat, GiaVe, TrangThai) VALUES

@@ -6,6 +6,7 @@ window.ExcelExport = (() => {
   const date = 'dd/mm/yyyy';
   const dateTime = 'dd/mm/yyyy hh:mm';
   const month = 'mm/yyyy';
+  const mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   let library;
 
   function loadLibrary() {
@@ -59,9 +60,11 @@ window.ExcelExport = (() => {
       };
     }
     const bytes = await workbook.xlsx.writeBuffer();
-    const url = URL.createObjectURL(new Blob([bytes], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    }));
+    saveBlob(new Blob([bytes], { type: mimeType }), filename);
+  }
+
+  function saveBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = filename + '.xlsx';
@@ -71,26 +74,52 @@ window.ExcelExport = (() => {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  function bind(id, report) {
+  async function download(request) {
+    const { url, snapshotId, filename } = request ?? {};
+    if (!snapshotId) throw new Error('Tải danh sách trước khi xuất Excel.');
+    if (!url || !filename) throw new Error('Thông tin xuất Excel không hợp lệ.');
+    const endpoint = new URL(url, window.location.href);
+    if (endpoint.origin !== window.location.origin) throw new Error('Địa chỉ xuất Excel không hợp lệ.');
+    endpoint.search = '';
+    endpoint.searchParams.set('snapshotId', snapshotId);
+    const response = await fetch(endpoint, { credentials: 'same-origin', cache: 'no-store' });
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      const messages = {
+        401: 'Vui lòng đăng nhập lại để xuất Excel.',
+        403: 'Bạn không có quyền xuất dữ liệu này.',
+        410: 'Kết quả đang xem đã hết hạn. Tải lại danh sách trước khi xuất Excel.'
+      };
+      throw new Error(body?.message || messages[response.status] || 'Không thể xuất Excel. Vui lòng thử lại.');
+    }
+    const type = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase();
+    if (type !== mimeType) throw new Error('Máy chủ không trả về tệp Excel hợp lệ.');
+    saveBlob(await response.blob(), filename);
+  }
+
+  function bindAction(id, run) {
     const button = document.getElementById(id);
     const message = document.getElementById(id + '-message');
     let available = false;
     let busy = false;
+    let revision = 0;
 
     button.addEventListener('click', async () => {
       if (!available || busy) return;
+      const clickRevision = revision;
       busy = true;
       button.disabled = true;
       button.textContent = 'Đang xuất…';
       message.classList.remove('text-danger');
       message.textContent = 'Đang tạo tệp Excel…';
       try {
-        const { filename, sheets } = await report();
-        await write(filename, sheets);
-        message.textContent = 'Đã gửi tệp Excel để tải xuống.';
+        await run();
+        if (clickRevision === revision) message.textContent = 'Đã gửi tệp Excel để tải xuống.';
       } catch (error) {
-        message.classList.add('text-danger');
-        message.textContent = error.responseJSON?.message || error.message || 'Không thể xuất Excel. Vui lòng thử lại.';
+        if (clickRevision === revision) {
+          message.classList.add('text-danger');
+          message.textContent = error.responseJSON?.message || error.message || 'Không thể xuất Excel. Vui lòng thử lại.';
+        }
       } finally {
         busy = false;
         button.disabled = !available;
@@ -99,11 +128,26 @@ window.ExcelExport = (() => {
     });
 
     return enabled => {
+      if (available && !enabled) revision++;
       available = Boolean(enabled);
       button.disabled = busy || !available;
-      if (!busy) message.textContent = '';
+      if (!busy || !available) {
+        message.textContent = '';
+        message.classList.remove('text-danger');
+      }
     };
   }
 
-  return { bind, asDate, money, integer, date, dateTime, month };
+  function bind(id, report) {
+    return bindAction(id, async () => {
+      const { filename, sheets } = await report();
+      await write(filename, sheets);
+    });
+  }
+
+  function bindDownload(id, getRequest) {
+    return bindAction(id, () => download(getRequest()));
+  }
+
+  return { bind, bindDownload, asDate, money, integer, date, dateTime, month };
 })();

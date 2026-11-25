@@ -2,7 +2,7 @@
 
 Dùng Node.js 24 và MySQL 8.0. Mở PowerShell tại thư mục `quanLyRapChieuPhim`.
 
-1. Trong MySQL Workbench, chọn schema đồ án đã có các bảng và dữ liệu mẫu. Chạy `sqlCode/create_tai_khoan.sql` trên schema đó để thêm bảng tài khoản.
+1. Trong MySQL Workbench, chọn schema đồ án đã có các bảng và dữ liệu mẫu. Chạy `sqlCode/create_tai_khoan.sql` trên schema đó để thêm bảng tài khoản. Với schema đã tạo trước G2, dừng ứng dụng rồi chạy toàn bộ `sqlCode/migrate_G2.sql` trên schema đã chọn trước khi dùng phiên bản này.
 2. Chạy `npm ci` để cài đúng phiên bản thư viện trong `package-lock.json`.
 3. Tạo `.env` từ `.env.example` nếu máy anh chưa có file này.
 
@@ -49,15 +49,16 @@ Sau khi đăng nhập, mở **Bán vé**, chọn phim rồi chọn một suất 
 
 Mở **Bắp nước và hóa đơn** trong thanh điều hướng. Nhân viên thêm và sửa combo, lập hóa đơn và xem chi tiết. Quản trị viên có thêm quyền xóa combo và xóa hóa đơn.
 
-- Bảng `HoaDon` lưu mỗi combo thành một dòng, nên một hóa đơn nhiều combo là nhiều dòng cùng `MaHoaDon`. Mã hóa đơn tự tăng theo dạng `HD001`, `HD002`, …
+- Bảng `DauHoaDon` lưu một khách cho mỗi mã hóa đơn. Bảng `HoaDon` lưu từng dòng combo và có khóa ngoại theo mã hóa đơn và mã khách. Mã hóa đơn tự tăng theo dạng `HD001`, `HD002`, … và ứng dụng giữ số đã cấp khi hóa đơn bị xóa.
 - Máy chủ tự tính `TongTien` = giá combo trong MySQL × số lượng. Đổi giá combo sau đó không làm thay đổi hóa đơn cũ.
 - Combo đã có trong hóa đơn không thể xóa (khóa ngoại). Hóa đơn nhập trùng combo được gộp số lượng.
+- Ngày chứng từ của hóa đơn trước G2 lấy theo dòng có thời điểm mua sớm nhất. Danh sách hóa đơn phân trang. Excel Combo và Hóa đơn lấy đủ các bản ghi khớp theo đúng dữ liệu và thứ tự của lần áp dụng truy vấn đang xem.
 
 ## Thống kê
 
 Mở **Thống kê**, chọn khoảng ngày (tối đa 366 ngày, mặc định 30 ngày gần nhất). Trang hiển thị tổng doanh thu vé và bắp nước, doanh thu theo ngày hoặc tháng, theo phim và theo combo.
 
-- Doanh thu vé tính theo ngày chiếu, loại vé đã hủy và suất bị hủy (cùng quy ước với `NormalQuery.sql`). Doanh thu bắp nước tính theo ngày lập hóa đơn.
+- Doanh thu vé tính theo ngày chiếu, loại vé đã hủy và suất bị hủy (cùng quy ước với `NormalQuery.sql`). Toàn bộ doanh thu bắp nước của một hóa đơn thuộc ngày chứng từ của hóa đơn đó.
 
 ## Dựng schema mới để thử
 
@@ -72,3 +73,10 @@ Tạo một schema mới nếu cần thử toàn bộ bộ dữ liệu. Chạy t
 7. `create_tai_khoan.sql`
 
 Chạy `test_function.sql` để đối chiếu T26 trên schema mới và `NormalQuery.sql` để đối chiếu T33. Nếu dùng dữ liệu mẫu từ phiên bản trước, suất `T26_DAY` có thể vẫn còn 1 ghế trống theo dữ liệu vé đã nạp. Cấu hình ứng dụng chạy cục bộ trên `127.0.0.1`. Phiên đăng nhập sẽ hết khi khởi động lại Node.js.
+
+Kiểm thử tích hợp G2 dùng kết nối MySQL cục bộ từ `.env`. Bộ kiểm thử tạo và dọn các schema thử riêng.
+
+```powershell
+$env:G2_TEST_MYSQL = '1'
+node --env-file=.env --test test/g2.integration.test.cjs
+```

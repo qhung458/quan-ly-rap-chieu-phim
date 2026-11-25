@@ -88,6 +88,29 @@ CREATE TABLE SuatChieu (
     INDEX IX_SuatChieu_LichPhong (MaPhong, NgayChieu, GioBatDau)
 );
 -- TAO BANG HOADON VA VE (chay sau Phim, PhongChieu, KhachHang, BapNuoc, Ghe, SuatChieu)
+CREATE TABLE DayMaHoaDon (
+    Id     TINYINT         NOT NULL PRIMARY KEY CHECK (Id = 1),
+    SoCuoi BIGINT UNSIGNED NOT NULL
+) ENGINE=InnoDB;
+INSERT INTO DayMaHoaDon (Id, SoCuoi) VALUES (1, 0);
+
+CREATE TABLE DauHoaDon (
+    MaHoaDon    VARCHAR(15) NOT NULL PRIMARY KEY,
+    MaKhachHang VARCHAR(10) NOT NULL,
+    NgayMua     DATETIME    NOT NULL,
+    CONSTRAINT UQ_DauHoaDon_KhachHang UNIQUE (MaHoaDon, MaKhachHang),
+    CONSTRAINT FK_DauHoaDon_KhachHang
+        FOREIGN KEY (MaKhachHang) REFERENCES KhachHang(MaKhachHang),
+    INDEX IX_DauHoaDon_NgayMua (NgayMua, MaHoaDon)
+) ENGINE=InnoDB;
+
+-- Giu ma lon nhat da cap, ke ca dau hoa don duoc chen bang SQL.
+CREATE TRIGGER BI_DauHoaDon_DayMa BEFORE INSERT ON DauHoaDon
+FOR EACH ROW
+    UPDATE DayMaHoaDon
+    SET SoCuoi = GREATEST(SoCuoi, CAST(SUBSTRING(NEW.MaHoaDon, 3) AS UNSIGNED))
+    WHERE Id = 1 AND NEW.MaHoaDon REGEXP '^HD[0-9]+$';
+
 -- BANG HOADON
 CREATE TABLE HoaDon (
     MaHoaDon     VARCHAR(15)   NOT NULL,
@@ -101,9 +124,11 @@ CREATE TABLE HoaDon (
     CHECK (TongTien >= 0),
     CONSTRAINT FK_HoaDon_KhachHang
         FOREIGN KEY (MaKhachHang) REFERENCES KhachHang(MaKhachHang),
+    CONSTRAINT FK_HoaDon_DauHoaDon
+        FOREIGN KEY (MaHoaDon, MaKhachHang) REFERENCES DauHoaDon(MaHoaDon, MaKhachHang) ON DELETE CASCADE,
     CONSTRAINT FK_HoaDon_BapNuoc
         FOREIGN KEY (MaCombo) REFERENCES BapNuoc(MaCombo)
-);
+) ENGINE=InnoDB;
 
 -- BANG VE
 CREATE TABLE Ve (

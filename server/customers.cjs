@@ -1,6 +1,8 @@
 const express = require('express');
 const db = require('./db.cjs');
 const { requireLogin, requireAdmin } = require('./auth.cjs');
+const { ListQueryError, parseListPagination, parseListQuery, vietnameseSearchColumn } = require('./list-query.cjs');
+const { withConsistentListRead } = require('./list-snapshots.cjs');
 
 const router = express.Router();
 const fields = 'MaKhachHang, TenKhachHang, SoDienThoai, Email';
@@ -36,6 +38,40 @@ router.get('/', async (req, res) => {
     [keyword, keyword, keyword, keyword]
   );
   res.json(rows);
+});
+
+const lookupQuery = {
+  searchColumns: ['MaKhachHang', 'TenKhachHang'].map(vietnameseSearchColumn),
+  phoneColumn: 'SoDienThoai',
+  filters: { ma: { type: 'exact', column: 'MaKhachHang', maxLength: 10 } },
+  sort: { ma: 'MaKhachHang' },
+  defaultSort: 'ma:asc',
+  tieBreakers: ['MaKhachHang']
+};
+
+router.get('/tuy-chon', async (req, res) => {
+  const { page: requestedPage, pageSize: requestedPageSize = '20', ...query } = req.query;
+  try {
+    if (query.sort !== undefined) throw new ListQueryError('sort');
+    const { page, pageSize } = parseListPagination(requestedPage, requestedPageSize);
+    const { filters, conditions, params, orderBy } = parseListQuery(query, lookupQuery);
+    if (filters.ma && conditions.length > 1) throw new ListQueryError('ma/q');
+    const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+    const { items, total } = await withConsistentListRead(db, async connection => {
+      const [[count]] = await connection.execute(`SELECT COUNT(*) AS total FROM KhachHang ${where}`, params);
+      const total = Number(count.total);
+      if (page > Math.ceil(total / pageSize)) return { items: [], total };
+      const [items] = await connection.execute(`
+        SELECT MaKhachHang, TenKhachHang, SoDienThoai FROM KhachHang ${where}
+        ORDER BY ${orderBy} LIMIT ? OFFSET ?
+      `, [...params, pageSize, (page - 1) * pageSize]);
+      return { items, total };
+    });
+    return res.json({ items, total, page, pageSize });
+  } catch (error) {
+    if (!(error instanceof ListQueryError)) throw error;
+    return res.status(error.status).json({ code: error.code, message: error.message });
+  }
 });
 
 router.post('/', async (req, res) => {

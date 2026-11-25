@@ -23,7 +23,7 @@ function withTotal(row) {
 }
 
 // Doanh thu vé tính theo ngày chiếu, bỏ suất đã hủy và vé đã hủy (cùng quy ước với NormalQuery.sql).
-// Doanh thu bắp nước tính theo ngày mua hóa đơn.
+// Toàn bộ doanh thu bắp nước thuộc ngày chứng từ của đầu hóa đơn.
 router.get('/', async (req, res) => {
   const fromDate = parseDate(req.query.tuNgay);
   const toDate = parseDate(req.query.denNgay);
@@ -47,10 +47,11 @@ router.get('/', async (req, res) => {
       GROUP BY sc.NgayChieu
     `, [from, to]),
     db.execute(`
-      SELECT DATE_FORMAT(NgayMua, '%Y-%m-%d') AS Ngay,
-             COUNT(DISTINCT MaHoaDon) AS SoHoaDon, COALESCE(SUM(TongTien), 0) AS DoanhThu
-      FROM HoaDon
-      WHERE NgayMua >= ? AND NgayMua < DATE_ADD(?, INTERVAL 1 DAY)
+      SELECT DATE_FORMAT(d.NgayMua, '%Y-%m-%d') AS Ngay,
+             COUNT(DISTINCT d.MaHoaDon) AS SoHoaDon, COALESCE(SUM(h.TongTien), 0) AS DoanhThu
+      FROM DauHoaDon d
+      JOIN HoaDon h ON h.MaHoaDon = d.MaHoaDon AND h.MaKhachHang = d.MaKhachHang
+      WHERE d.NgayMua >= ? AND d.NgayMua < DATE_ADD(?, INTERVAL 1 DAY)
       GROUP BY Ngay
     `, [from, to]),
     db.execute(`
@@ -64,9 +65,10 @@ router.get('/', async (req, res) => {
     `, [from, to]),
     db.execute(`
       SELECT b.MaCombo, b.TenCombo, SUM(h.SoLuongCombo) AS SoLuong, SUM(h.TongTien) AS DoanhThu
-      FROM HoaDon h
+      FROM DauHoaDon d
+      JOIN HoaDon h ON h.MaHoaDon = d.MaHoaDon AND h.MaKhachHang = d.MaKhachHang
       JOIN BapNuoc b ON b.MaCombo = h.MaCombo
-      WHERE h.NgayMua >= ? AND h.NgayMua < DATE_ADD(?, INTERVAL 1 DAY)
+      WHERE d.NgayMua >= ? AND d.NgayMua < DATE_ADD(?, INTERVAL 1 DAY)
       GROUP BY b.MaCombo, b.TenCombo
       ORDER BY DoanhThu DESC, b.TenCombo
     `, [from, to])

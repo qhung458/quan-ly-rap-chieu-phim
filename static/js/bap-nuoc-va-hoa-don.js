@@ -1,10 +1,12 @@
-/* global jQuery */
+/* global jQuery, ListQuery, ExcelExport */
 (() => {
   if (!window.jQuery) return;
 
   const $ = jQuery;
   const comboApi = '/api/bap-nuoc';
   const invoiceApi = '/api/hoa-don';
+  const customerApi = '/api/khach-hang/tuy-chon';
+  const customerPageSize = 20;
   const money = new Intl.NumberFormat('vi-VN');
   const formatMoney = value => money.format(value) + ' ₫';
   const $comboRows = $('#combo-rows');
@@ -14,6 +16,10 @@
   const $invoiceForm = $('#invoice-form');
   const $invoiceMessage = $('#invoice-message');
   const $customer = $('#invoice-customer');
+  const $customerSearch = $('#customer-search');
+  const $customerMessage = $('#customer-lookup-message');
+  const $customerMore = $('#customer-more');
+  const $comboFilter = $('#invoice-combo-filter');
   const $lines = $('#invoice-lines');
   const $deleteCombo = $('#delete-combo');
   const $deleteInvoice = $('#delete-invoice');
@@ -22,48 +28,16 @@
   let selectedCombo = null;
   let selectedInvoice = null;
   let saving = false;
-  let comboVersion = 0;
-  let invoiceVersion = 0;
+  let comboOptionsVersion = 0;
   let customerVersion = 0;
+  let customerRows = [];
+  let selectedCustomer = null;
+  let customerPage = 0;
+  let customerTotal = 0;
+  let customerLoading = false;
   let detailVersion = 0;
-  let comboTimer;
-  let invoiceTimer;
+  let detailLoading = false;
   let customerTimer;
-
-  const enableComboExport = ExcelExport.bind('combo-export', () => ({
-    filename: 'danh-muc-combo',
-    sheets: [{
-      name: 'Danh mục combo',
-      columns: [['Mã combo', 16], ['Tên combo', 32], ['Mô tả', 42], ['Giá', 18, ExcelExport.money],
-        ['Đã bán', 13, ExcelExport.integer]],
-      rows: Array.from($comboRows.children(), row => $(row).data('combo')).filter(Boolean).map(combo =>
-        [combo.MaCombo, combo.TenCombo, combo.MoTa, Number(combo.GiaCombo), Number(combo.DaBan)])
-    }]
-  }));
-
-  const enableInvoiceExport = ExcelExport.bind('invoice-export', async () => {
-    const invoices = Array.from($invoiceRows.children(), row => $(row).data('invoice')).filter(Boolean);
-    const details = [];
-    for (let index = 0; index < invoices.length; index += 5) {
-      const batch = invoices.slice(index, index + 5);
-      details.push(...await Promise.all(batch.map(invoice =>
-        $.getJSON(invoiceApi + '/' + encodeURIComponent(invoice.MaHoaDon))
-      )));
-    }
-    return {
-      filename: 'hoa-don',
-      sheets: [
-        { name: 'Hóa đơn', columns: [['Mã hóa đơn', 18], ['Mã khách', 16], ['Khách hàng', 30],
-          ['Ngày mua', 22, ExcelExport.dateTime], ['Số lượng', 14, ExcelExport.integer], ['Tổng tiền', 20, ExcelExport.money]],
-          rows: invoices.map(row => [row.MaHoaDon, row.MaKhachHang, row.TenKhachHang,
-            ExcelExport.asDate(row.NgayMua), row.SoLuong, row.TongTien]) },
-        { name: 'Chi tiết combo', columns: [['Mã hóa đơn', 18], ['Mã combo', 16], ['Combo', 32],
-          ['Số lượng', 14, ExcelExport.integer], ['Đơn giá', 18, ExcelExport.money], ['Thành tiền', 20, ExcelExport.money]],
-          rows: details.flatMap(invoice => invoice.ChiTiet.map(line =>
-            [invoice.MaHoaDon, line.MaCombo, line.TenCombo, line.SoLuong, line.DonGia, line.ThanhTien])) }
-      ]
-    };
-  });
 
   function showError($message, xhr) {
     if (xhr.status === 401) {
@@ -77,16 +51,157 @@
     $body.empty().append($('<tr>').append($('<td>', { colspan: columns, text: message })));
   }
 
+  function bindList({ id, api, filename, defaultSort, pageSize, $rows, columns, noun, rowRenderer, labels }) {
+    const $form = $('#' + id + '-query');
+    const fields = $form.find('[name]').toArray();
+    const $main = $form.find('[data-sort-main]');
+    const $mainDir = $form.find('[data-sort-main-dir]');
+    const $extra = $form.find('[data-sort-extra]');
+    const $extraDir = $form.find('[data-sort-extra-dir]');
+    const $chips = $form.find('[data-query-conditions]');
+    const $count = $('#' + id + '-count');
+    const $pagination = $('#' + id + '-pagination');
+    const $prev = $pagination.find('[data-page-prev]');
+    const $next = $pagination.find('[data-page-next]');
+    const sortLabels = new Map($main.find('option').toArray().map(option => [option.value, option.text]));
+    $extra.append($main.find('option').clone());
+
+    const enableExport = ExcelExport.bindDownload(id + '-export', () => ({
+      url: api + '/xuat', filename, snapshotId: controller.getSnapshotId()
+    }));
+    const controller = ListQuery.create({
+      defaults: { sort: defaultSort }, pageSize, load: ListQuery.loadFrom(api), onChange: render
+    });
+
+    function syncSortControls() {
+      const primary = $main.val();
+      if ($extra.val() === primary) $extra.val('');
+      $extra.find('option').each(function () { this.disabled = this.value === primary; });
+      $extraDir.prop('disabled', !$extra.val());
+    }
+
+    function writeDraft(query) {
+      for (const field of fields) {
+        $(field).val(query[field.name] ?? (field.multiple ? [] : ''));
+      }
+      const [main, extra = ''] = (query.sort || defaultSort).split(',');
+      const [mainField, mainDir] = main.split(':');
+      const [extraField, extraDir = 'asc'] = extra.split(':');
+      $main.val(mainField);
+      $mainDir.val(mainDir);
+      $extra.val(extraField);
+      $extraDir.val(extraDir);
+      syncSortControls();
+    }
+
+    function readDraft() {
+      const query = Object.fromEntries(fields.map(field => [field.name, $(field).val() ?? '']));
+      const order = [$main.val() + ':' + $mainDir.val()];
+      if ($extra.val()) order.push($extra.val() + ':' + $extraDir.val());
+      return { ...query, sort: order.join(',') };
+    }
+
+    function chipText(name, value) {
+      if (name === 'sort') {
+        return value.split(',').map(order => {
+          const [key, direction] = order.split(':');
+          return sortLabels.get(key) + (direction === 'desc' ? ' giảm' : ' tăng');
+        }).join(', rồi ');
+      }
+      const display = id === 'invoice' && name === 'maCombo'
+        ? combos.find(combo => combo.MaCombo === value)?.TenCombo ?? value
+        : value;
+      return labels[name] + ' · ' + display;
+    }
+
+    function renderChips(applied) {
+      $chips.empty();
+      for (const [name, selection] of Object.entries(applied)) {
+        if (!selection || (name === 'sort' && selection === defaultSort)) continue;
+        for (const value of Array.isArray(selection) ? selection : [selection]) {
+          const label = chipText(name, value);
+          const $chip = $('<button>', {
+            type: 'button', class: 'btn btn-outline-secondary btn-sm query-chip',
+            text: label + ' ×', 'aria-label': 'Bỏ điều kiện ' + label
+          }).on('click', () => {
+            controller.setDraft(readDraft());
+            controller.remove(name, value);
+            writeDraft(controller.getState().draft);
+            $form.find('button[type="submit"]').trigger('focus');
+          });
+          $chips.append($('<li>').append($chip));
+        }
+      }
+      $chips.prop('hidden', !$chips.children().length);
+    }
+
+    function render(state) {
+      const ready = state.status === 'ready';
+      enableExport(ready && Boolean(state.snapshotId));
+      renderChips(state.applied);
+      $rows.closest('table').attr('aria-busy', String(state.status === 'loading'));
+      $count.text(ready || state.status === 'empty' ? `${state.total} ${noun}` : '');
+      if (ready) rowRenderer(state.items);
+      if (state.status === 'loading') emptyRow($rows, columns, `Đang tải ${noun}…`);
+      if (state.status === 'empty') emptyRow($rows, columns, `Không tìm thấy ${noun} phù hợp.`);
+      if (state.status === 'error') {
+        if (state.error.status === 401) {
+          location.assign('dang-nhap.html');
+          return;
+        }
+        emptyRow($rows, columns, state.error.message);
+      }
+      if ($pagination.length) {
+        const pages = Math.ceil(state.total / state.pageSize);
+        $pagination.prop('hidden', pages <= 1);
+        $prev.prop('disabled', !ready || state.page <= 1);
+        $next.prop('disabled', !ready || state.page >= pages);
+        $pagination.find('[data-page-position]').text(pages > 1 ? `Trang ${state.page} / ${pages}` : '');
+      }
+    }
+
+    $main.add($extra).on('change', syncSortControls);
+    $form.on('submit', event => {
+      event.preventDefault();
+      if (!user) return;
+      controller.setDraft(readDraft());
+      controller.apply();
+    });
+    $form.find('[data-query-reset]').on('click', () => {
+      controller.reset();
+      writeDraft(controller.getState().draft);
+    });
+    $form.find('[data-query-refresh]').on('click', () => controller.refresh());
+    $prev.on('click', () => controller.goToPage(controller.getState().page - 1));
+    $next.on('click', () => controller.goToPage(controller.getState().page + 1));
+    writeDraft(controller.getState().draft);
+    return controller;
+  }
+
+  const comboList = bindList({
+    id: 'combo', api: comboApi, filename: 'danh-muc-combo', defaultSort: 'maCombo:asc', pageSize: null,
+    $rows: $comboRows, columns: 4, noun: 'combo', rowRenderer: renderCombos,
+    labels: { q: 'Từ khóa', maCombo: 'Mã combo', ten: 'Tên combo', moTa: 'Mô tả',
+      giaMin: 'Giá từ', giaMax: 'Giá đến', daBanMin: 'Đã bán từ', daBanMax: 'Đã bán đến' }
+  });
+  const invoiceList = bindList({
+    id: 'invoice', api: invoiceApi, filename: 'hoa-don', defaultSort: 'ngayMua:desc,maHoaDon:desc',
+    $rows: $invoiceRows, columns: 5, noun: 'hóa đơn', rowRenderer: renderInvoices,
+    labels: { q: 'Từ khóa', maHoaDon: 'Mã hóa đơn', maKhachHang: 'Mã khách', tenKhachHang: 'Tên khách',
+      soDienThoai: 'SĐT', tuNgay: 'Từ ngày', denNgay: 'Đến ngày', tongMin: 'Tổng tiền từ',
+      tongMax: 'Tổng tiền đến', maCombo: 'Có combo' }
+  });
+
   function syncButtons() {
     const admin = user?.VaiTro === 'QuanTriVien';
     $comboForm.find('button[value="them"]').prop('disabled', !user || saving || Boolean(selectedCombo));
     $comboForm.find('button[value="sua"]').prop('disabled', saving || !selectedCombo);
     $deleteCombo.prop('disabled', saving || !selectedCombo || !admin);
     $('#clear-combo').prop('disabled', !user || saving);
-    $('#add-line').prop('disabled', !user || saving || !combos.length);
+    $('#add-line').prop('disabled', !user || saving || !combos.length || $lines.children().length >= 10);
     $('#invoice-submit').prop('disabled', !user || saving || !$customer.val() ||
       !$lines.children().length || $lines.find('.line-combo').toArray().some(select => !select.value));
-    $deleteInvoice.prop('hidden', !selectedInvoice || !admin).prop('disabled', saving);
+    $deleteInvoice.prop('hidden', !selectedInvoice || !admin).prop('disabled', saving || detailLoading);
   }
 
   /* ---------- Combo ---------- */
@@ -109,10 +224,7 @@
   }
 
   function renderCombos(rows) {
-    enableComboExport(rows.length);
     $comboRows.empty();
-    $('#combo-count').text(rows.length + ' combo');
-    if (!rows.length) emptyRow($comboRows, 4, 'Không tìm thấy combo.');
     for (const combo of rows) {
       const active = combo.MaCombo === selectedCombo?.MaCombo;
       $comboRows.append($('<tr>').data('combo', combo).toggleClass('is-selected', active).append(
@@ -126,32 +238,21 @@
     }
   }
 
-  async function loadComboRows() {
-    const version = ++comboVersion;
-    enableComboExport(false);
-    const keyword = $('#combo-search').val().trim();
+  async function loadComboOptions() {
+    const version = ++comboOptionsVersion;
     try {
-      const rows = keyword ? await $.getJSON(comboApi, { q: keyword }) : combos;
-      if (version === comboVersion) renderCombos(rows);
-    } catch (xhr) {
-      if (version !== comboVersion) return;
-      emptyRow($comboRows, 4, 'Không tải được danh mục combo.');
-      $('#combo-count').empty();
-      showError($comboMessage, xhr);
-    }
-  }
-
-  async function loadCombos() {
-    try {
-      combos = await $.getJSON(comboApi);
+      const options = await $.ajax({ url: comboApi + '/tuy-chon', dataType: 'json', cache: false });
+      if (version !== comboOptionsVersion) return;
+      combos = options;
+      const selected = $comboFilter.val();
+      $comboFilter.empty().append(combos.map(combo => $('<option>', {
+        value: combo.MaCombo, text: combo.MaCombo + ' · ' + combo.TenCombo
+      }))).val(selected);
       refreshLineOptions();
       if (!$lines.children().length) addLine();
       syncButtons();
-      await loadComboRows();
     } catch (xhr) {
-      emptyRow($comboRows, 4, 'Không tải được danh mục combo.');
-      $('#combo-count').empty();
-      showError($comboMessage, xhr);
+      if (version === comboOptionsVersion) showError($invoiceMessage, xhr);
     }
   }
 
@@ -167,8 +268,7 @@
       });
       setCombo(method === 'DELETE' ? null : saved);
       $comboMessage.text({ POST: 'Đã thêm combo.', PUT: 'Đã cập nhật combo.', DELETE: 'Đã xóa combo.' }[method]);
-      await loadCombos();
-      await loadInvoices();
+      await Promise.all([loadComboOptions(), comboList.refresh(), invoiceList.refresh()]);
     } catch (xhr) {
       showError($comboMessage, xhr);
     } finally {
@@ -204,37 +304,53 @@
     }
   });
 
-  $('#combo-search').on('input', () => {
-    comboVersion++;
-    enableComboExport(false);
-    clearTimeout(comboTimer);
-    comboTimer = setTimeout(loadComboRows, 250);
-  });
-
   /* ---------- Lập hóa đơn ---------- */
 
-  async function loadCustomers() {
+  function renderCustomers() {
+    const selectedCode = selectedCustomer?.MaKhachHang ?? '';
+    const rows = customerRows.some(row => row.MaKhachHang === selectedCode) || !selectedCustomer
+      ? customerRows : [selectedCustomer, ...customerRows];
+    $customer.empty().append($('<option>', { value: '', text: 'Chọn khách hàng…' }));
+    for (const row of rows) {
+      $customer.append($('<option>', {
+        value: row.MaKhachHang,
+        text: row.MaKhachHang + ' · ' + row.TenKhachHang + ' · ' + row.SoDienThoai
+      }));
+    }
+    $customer.val(selectedCode);
+    syncButtons();
+  }
+
+  function setCustomerPaging() {
+    const hasMore = customerPage * customerPageSize < customerTotal;
+    $customerMore.prop({ hidden: !hasMore, disabled: customerLoading });
+  }
+
+  async function loadCustomers(page = 1) {
     const version = ++customerVersion;
-    const keep = $customer.val();
+    customerLoading = true;
+    $customerMessage.removeClass('text-danger').addClass('text-secondary').text('Đang tìm khách hàng…');
+    setCustomerPaging();
     try {
-      const rows = await $.getJSON('/api/khach-hang', { q: $('#customer-search').val() });
+      const result = await $.getJSON(customerApi, { q: $customerSearch.val(), page, pageSize: customerPageSize });
       if (version !== customerVersion) return;
-      $customer.empty();
-      if (!rows.length) {
-        $customer.append($('<option>', { value: '', text: 'Không tìm thấy khách hàng' }));
-      } else {
-        $customer.append($('<option>', { value: '', text: 'Chọn khách hàng…' }));
-        for (const row of rows) {
-          $customer.append($('<option>', {
-            value: row.MaKhachHang,
-            text: row.MaKhachHang + ' · ' + row.TenKhachHang + ' · ' + row.SoDienThoai
-          }));
-        }
-        if (rows.some(row => row.MaKhachHang === keep)) $customer.val(keep);
+      const customers = new Map((page === 1 ? [] : customerRows).map(row => [row.MaKhachHang, row]));
+      result.items.forEach(row => customers.set(row.MaKhachHang, row));
+      customerRows = [...customers.values()];
+      customerPage = result.page;
+      customerTotal = result.total;
+      if (selectedCustomer && customers.has(selectedCustomer.MaKhachHang)) {
+        selectedCustomer = customers.get(selectedCustomer.MaKhachHang);
       }
-      syncButtons();
+      renderCustomers();
+      $customerMessage.text(customerTotal ? `${customerRows.length} / ${customerTotal} khách phù hợp` : 'Không tìm thấy khách phù hợp.');
     } catch (xhr) {
-      if (version === customerVersion) showError($invoiceMessage, xhr);
+      if (version === customerVersion) showError($customerMessage.removeClass('text-secondary'), xhr);
+    } finally {
+      if (version === customerVersion) {
+        customerLoading = false;
+        setCustomerPaging();
+      }
     }
   }
 
@@ -250,6 +366,7 @@
     $lines.find('.line-combo').each(function () {
       const current = $(this).val();
       $(this).empty().append($('<option>', { value: '', text: 'Chọn combo…' }), comboOptions(current));
+      if (!combos.some(combo => combo.MaCombo === current)) $(this).val('');
     });
     updateTotal();
   }
@@ -294,11 +411,23 @@
     updateTotal();
     syncButtons();
   });
-  $customer.on('change', syncButtons);
-  $('#customer-search').on('input', () => {
+  $customer.on('change', () => {
+    const code = $customer.val();
+    selectedCustomer = customerRows.find(row => row.MaKhachHang === code) ??
+      (selectedCustomer?.MaKhachHang === code ? selectedCustomer : null);
+    syncButtons();
+  });
+  $customerMore.on('click', () => { if (!customerLoading) loadCustomers(customerPage + 1); });
+  $customerSearch.on('input', () => {
     customerVersion++;
     clearTimeout(customerTimer);
-    customerTimer = setTimeout(loadCustomers, 250);
+    customerPage = 0;
+    customerTotal = 0;
+    customerRows = [];
+    renderCustomers();
+    setCustomerPaging();
+    $customerMessage.removeClass('text-danger').addClass('text-secondary').text('Đang tìm khách hàng…');
+    customerTimer = setTimeout(() => loadCustomers(), 250);
   });
 
   $invoiceForm.on('submit', async event => {
@@ -326,12 +455,13 @@
         url: invoiceApi, method: 'POST', contentType: 'application/json',
         data: JSON.stringify({ MaKhachHang: $customer.val(), ChiTiet: lines })
       });
+      detailVersion++;
+      detailLoading = false;
+      renderDetail(invoice);
       $invoiceMessage.text('Đã lưu hóa đơn ' + invoice.MaHoaDon + ' — ' + formatMoney(invoice.TongTien) + '.');
       $lines.empty();
       addLine();
-      await loadCombos();
-      await loadInvoices();
-      renderDetail(invoice);
+      await Promise.all([comboList.refresh(), invoiceList.refresh()]);
     } catch (xhr) {
       showError($invoiceMessage, xhr);
     } finally {
@@ -343,39 +473,22 @@
   /* ---------- Danh sách và chi tiết hóa đơn ---------- */
 
   function renderInvoices(rows) {
-    enableInvoiceExport(rows.length);
     $invoiceRows.empty();
-    $('#invoice-count').text(rows.length + ' hóa đơn');
-    if (!rows.length) emptyRow($invoiceRows, 4, 'Không tìm thấy hóa đơn.');
     for (const row of rows) {
       const active = row.MaHoaDon === selectedInvoice;
-      $invoiceRows.append($('<tr>').data('code', row.MaHoaDon).data('invoice', row).toggleClass('is-selected', active).append(
+      $invoiceRows.append($('<tr>').data('code', row.MaHoaDon).toggleClass('is-selected', active).append(
         $('<td>').append($('<button>', {
           type: 'button', class: 'customer-selector', text: row.MaHoaDon, 'aria-pressed': String(active)
         })),
         $('<td>').text(row.TenKhachHang),
         $('<td>').text(row.NgayMua),
+        $('<td class="money">').text(row.SoLuong),
         $('<td class="money">').text(formatMoney(row.TongTien))
       ));
     }
   }
 
-  async function loadInvoices() {
-    const version = ++invoiceVersion;
-    enableInvoiceExport(false);
-    const params = { q: $('#invoice-search').val(), tuNgay: $('#invoice-from').val(), denNgay: $('#invoice-to').val() };
-    try {
-      const rows = await $.getJSON(invoiceApi, params);
-      if (version === invoiceVersion) renderInvoices(rows);
-    } catch (xhr) {
-      if (version !== invoiceVersion) return;
-      emptyRow($invoiceRows, 4, 'Không tải được hóa đơn.');
-      $('#invoice-count').empty();
-      showError($invoiceMessage, xhr);
-    }
-  }
-
-  function renderDetail(invoice) {
+  function renderDetail(invoice, message = 'Chọn một hóa đơn để xem chi tiết.') {
     selectedInvoice = invoice?.MaHoaDon ?? null;
     const $detail = $('#invoice-detail').empty();
     $invoiceRows.find('tr').each(function () {
@@ -384,7 +497,7 @@
     });
     syncButtons();
     if (!invoice) {
-      $detail.append($('<p class="text-secondary mb-0">').text('Chọn một hóa đơn để xem chi tiết.'));
+      $detail.append($('<p class="text-secondary mb-0">').text(message));
       return;
     }
 
@@ -421,31 +534,34 @@
 
   async function openInvoice(code) {
     const version = ++detailVersion;
+    detailLoading = true;
+    renderDetail(null, 'Đang tải chi tiết hóa đơn…');
     try {
       const invoice = await $.getJSON(invoiceApi + '/' + encodeURIComponent(code));
       if (version === detailVersion) renderDetail(invoice);
     } catch (xhr) {
-      if (version === detailVersion) showError($invoiceMessage, xhr);
+      if (version === detailVersion) {
+        renderDetail(null, 'Không tải được chi tiết hóa đơn.');
+        showError($invoiceMessage, xhr);
+      }
+    } finally {
+      if (version === detailVersion) {
+        detailLoading = false;
+        syncButtons();
+      }
     }
   }
 
   $invoiceRows.on('click', 'tr', function () {
     const code = $(this).data('code');
-    if (code) {
-      $invoiceMessage.empty();
+    if (code && !saving) {
+      $invoiceMessage.removeClass('text-danger').empty();
       openInvoice(code);
     }
   });
 
-  $('#invoice-search, #invoice-from, #invoice-to').on('input change', () => {
-    invoiceVersion++;
-    enableInvoiceExport(false);
-    clearTimeout(invoiceTimer);
-    invoiceTimer = setTimeout(loadInvoices, 250);
-  });
-
   $deleteInvoice.on('click', async () => {
-    if (!selectedInvoice || saving || !window.confirm('Xóa hóa đơn ' + selectedInvoice + '?')) return;
+    if (!selectedInvoice || saving || detailLoading || !window.confirm('Xóa hóa đơn ' + selectedInvoice + '?')) return;
     saving = true;
     syncButtons();
     try {
@@ -453,8 +569,7 @@
       detailVersion++;
       renderDetail(null);
       $invoiceMessage.removeClass('text-danger').text('Đã xóa hóa đơn.');
-      await loadCombos();
-      await loadInvoices();
+      await Promise.all([comboList.refresh(), invoiceList.refresh()]);
     } catch (xhr) {
       showError($invoiceMessage, xhr);
     } finally {
@@ -472,16 +587,17 @@
     }
   });
 
-  $.getJSON('/api/auth/me').done(async account => {
+  $.getJSON('/api/auth/me').done(account => {
     user = account;
     $('#account-name').text(user.HoTen + ' · ' +
       (user.VaiTro === 'QuanTriVien' ? 'Quản trị viên' : 'Nhân viên quầy'));
     $('#logout-button').prop('hidden', false);
-    $('#customer-search, #combo-search, #invoice-search, #invoice-from, #invoice-to, #invoice-customer')
-      .prop('disabled', false);
-    await loadCombos();
+    $('#customer-search, #invoice-customer, #combo-query fieldset, #invoice-query fieldset').prop('disabled', false);
     syncButtons();
+    renderCustomers();
+    loadComboOptions();
     loadCustomers();
-    loadInvoices();
+    comboList.refresh();
+    invoiceList.refresh();
   }).fail(xhr => showError($invoiceMessage, xhr));
 })();

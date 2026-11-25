@@ -62,8 +62,46 @@
               </div>
               <span id="combo-count" class="text-secondary small" role="status"></span>
             </div>
-            <label class="visually-hidden" for="combo-search">Tìm combo</label>
-            <input class="form-control mb-3" type="search" id="combo-search" placeholder="Mã, tên hoặc mô tả combo" disabled>
+            <form id="combo-query" class="list-query mb-3">
+              <fieldset disabled>
+                <label class="form-label" for="combo-search">Tìm combo</label>
+                <input class="form-control" type="search" id="combo-search" name="q" maxlength="100" placeholder="Mã, tên hoặc mô tả combo">
+                <details class="query-details">
+                  <summary>Tìm nâng cao và bộ lọc</summary>
+                  <div class="query-grid">
+                    <label>Mã combo chính xác<input class="form-control" name="maCombo" maxlength="10"></label>
+                    <label>Tên combo<input class="form-control" name="ten" maxlength="100"></label>
+                    <label>Mô tả<input class="form-control" name="moTa" maxlength="255"></label>
+                    <label>Giá từ (₫)<input class="form-control" name="giaMin" type="number" min="0" step="0.01"></label>
+                    <label>Giá đến (₫)<input class="form-control" name="giaMax" type="number" min="0" step="0.01"></label>
+                    <label>Đã bán từ<input class="form-control" name="daBanMin" type="number" min="0" step="1"></label>
+                    <label>Đã bán đến<input class="form-control" name="daBanMax" type="number" min="0" step="1"></label>
+                  </div>
+                </details>
+                <details class="query-details">
+                  <summary>Sắp xếp</summary>
+                  <div class="query-grid">
+                    <label>Tiêu chí chính
+                      <select class="form-select" data-sort-main>
+                        <option value="maCombo">Mã combo</option>
+                        <option value="ten">Tên combo</option>
+                        <option value="gia">Giá</option>
+                        <option value="daBan">Đã bán</option>
+                      </select>
+                    </label>
+                    <label>Thứ tự chính<select class="form-select" data-sort-main-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                    <label>Tiêu chí phụ<select class="form-select" data-sort-extra><option value="">Không dùng</option></select></label>
+                    <label>Thứ tự phụ<select class="form-select" data-sort-extra-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                  </div>
+                </details>
+                <div class="query-actions">
+                  <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
+                </div>
+              </fieldset>
+              <ul class="query-conditions" data-query-conditions aria-label="Điều kiện đang áp dụng" hidden></ul>
+            </form>
             <div class="table-responsive">
               <table class="table align-middle customer-table mb-0" aria-labelledby="combos-title">
                 <thead>
@@ -88,6 +126,10 @@
                 <input class="form-control" id="customer-search" type="search" placeholder="Mã, tên hoặc số điện thoại" disabled>
                 <label class="form-label" for="invoice-customer">Khách hàng</label>
                 <select class="form-select" id="invoice-customer" required disabled></select>
+                <div class="customer-lookup-status mb-3">
+                  <span id="customer-lookup-message" class="small text-secondary" role="status"></span>
+                  <button class="btn btn-outline-secondary btn-sm" id="customer-more" type="button" hidden>Tải thêm khách</button>
+                </div>
                 <div class="d-flex justify-content-between align-items-center mb-2">
                   <span class="form-label mb-0">Combo</span>
                   <button class="btn btn-outline-dark btn-sm" id="add-line" type="button" disabled>Thêm dòng</button>
@@ -115,11 +157,52 @@
               </div>
               <span id="invoice-count" class="text-secondary small" role="status"></span>
             </div>
-            <div class="invoice-filter">
-              <input class="form-control" type="search" id="invoice-search" aria-label="Tìm hóa đơn" placeholder="Mã hóa đơn, khách hàng" disabled>
-              <input class="form-control" type="date" id="invoice-from" aria-label="Từ ngày" disabled>
-              <input class="form-control" type="date" id="invoice-to" aria-label="Đến ngày" disabled>
-            </div>
+            <form id="invoice-query" class="list-query mb-3">
+              <fieldset disabled>
+                <div class="query-grid invoice-search-grid">
+                  <label>Tìm hóa đơn<input class="form-control" type="search" id="invoice-search" name="q" maxlength="100" placeholder="Mã hóa đơn, mã, tên hoặc SĐT khách"></label>
+                  <label>Từ ngày mua<input class="form-control" type="date" id="invoice-from" name="tuNgay"></label>
+                  <label>Đến ngày mua<input class="form-control" type="date" id="invoice-to" name="denNgay"></label>
+                </div>
+                <details class="query-details">
+                  <summary>Tìm nâng cao và bộ lọc</summary>
+                  <div class="query-grid">
+                    <label>Mã hóa đơn chính xác<input class="form-control" name="maHoaDon" maxlength="15"></label>
+                    <label>Mã khách chính xác<input class="form-control" name="maKhachHang" maxlength="10"></label>
+                    <label>Tên khách<input class="form-control" name="tenKhachHang" maxlength="100"></label>
+                    <label>SĐT chính xác<input class="form-control" name="soDienThoai" type="tel" maxlength="30"></label>
+                    <label>Tổng tiền từ (₫)<input class="form-control" name="tongMin" type="number" min="0" step="0.01"></label>
+                    <label>Tổng tiền đến (₫)<input class="form-control" name="tongMax" type="number" min="0" step="0.01"></label>
+                    <label class="query-wide">Hóa đơn có ít nhất một combo đã chọn
+                      <select class="form-select" id="invoice-combo-filter" name="maCombo" size="4" multiple></select>
+                      <small class="text-secondary">Giữ Ctrl hoặc ⌘ để chọn nhiều combo.</small>
+                    </label>
+                  </div>
+                </details>
+                <details class="query-details">
+                  <summary>Sắp xếp</summary>
+                  <div class="query-grid">
+                    <label>Tiêu chí chính
+                      <select class="form-select" data-sort-main>
+                        <option value="ngayMua">Ngày mua</option>
+                        <option value="maHoaDon">Mã hóa đơn</option>
+                        <option value="tongTien">Tổng tiền</option>
+                        <option value="soLuong">Tổng số phần</option>
+                      </select>
+                    </label>
+                    <label>Thứ tự chính<select class="form-select" data-sort-main-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                    <label>Tiêu chí phụ<select class="form-select" data-sort-extra><option value="">Không dùng</option></select></label>
+                    <label>Thứ tự phụ<select class="form-select" data-sort-extra-dir><option value="asc">Tăng dần</option><option value="desc">Giảm dần</option></select></label>
+                  </div>
+                </details>
+                <div class="query-actions">
+                  <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-reset>Đặt lại</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" data-query-refresh>Tải lại</button>
+                </div>
+              </fieldset>
+              <ul class="query-conditions" data-query-conditions aria-label="Điều kiện đang áp dụng" hidden></ul>
+            </form>
             <div class="table-responsive">
               <table class="table align-middle customer-table mb-0" aria-labelledby="invoices-title">
                 <thead>
@@ -127,17 +210,24 @@
                     <th scope="col">Mã HĐ</th>
                     <th scope="col">Khách hàng</th>
                     <th scope="col">Ngày mua</th>
+                    <th scope="col" class="text-end">Số phần</th>
                     <th scope="col" class="text-end">Tổng tiền</th>
                   </tr>
                 </thead>
-                <tbody id="invoice-rows"><tr><td colspan="4">Đang tải hóa đơn…</td></tr></tbody>
+                <tbody id="invoice-rows"><tr><td colspan="5">Đang tải hóa đơn…</td></tr></tbody>
               </table>
             </div>
+            <nav class="query-pagination" id="invoice-pagination" aria-label="Phân trang hóa đơn" hidden>
+              <button class="btn btn-outline-secondary btn-sm" type="button" data-page-prev>Trang trước</button>
+              <span class="small" data-page-position role="status"></span>
+              <button class="btn btn-outline-secondary btn-sm" type="button" data-page-next>Trang sau</button>
+            </nav>
           </section>
         </div>
       </div>
     </main>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="../js/truy-van-danh-sach.js"></script>
     <script src="../js/xuat-excel.js"></script>
     <script src="../js/bap-nuoc-va-hoa-don.js"></script>
   </body>
