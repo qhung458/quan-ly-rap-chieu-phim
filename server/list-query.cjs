@@ -93,7 +93,7 @@ function parseFilter(value, field, filter) {
 
 function filterValues(raw, field, filter) {
   const inputs = filter.multiple && Array.isArray(raw) ? raw : [raw];
-  if (inputs.length > 50) throw new ListQueryError(field);
+  if (inputs.length > (filter.maxValues ?? 50)) throw new ListQueryError(field);
   return Array.from(new Set(inputs
     .map(value => scalar(value, field, filter.maxLength ?? 100))
     .filter(Boolean)

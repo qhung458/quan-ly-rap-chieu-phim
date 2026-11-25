@@ -1,6 +1,8 @@
 const express = require('express');
 const db = require('./db.cjs');
 const { requireLogin, requireAdmin } = require('./auth.cjs');
+const { ListQueryError, parseListQuery } = require('./list-query.cjs');
+const { withConsistentListRead } = require('./list-snapshots.cjs');
 const transaction = require('./transaction.cjs');
 
 const router = express.Router();
@@ -8,6 +10,31 @@ const maxSeats = 130;
 const roomCodePattern = /^[A-Z0-9_-]{1,10}$/;
 const seatCodeLock = 'rap_ghe';
 const maxSeatCodeNumber = 9_999_999_999_999;
+const seatCount = 'COUNT(g.MaGhe)';
+const roomListQuery = {
+  filters: {
+    loaiPhong: { type: 'enum', values: ['2D', '3D'] },
+    soGheMin: { type: 'integer', column: seatCount, operator: '>=' },
+    soGheMax: { type: 'integer', column: seatCount, operator: '<=' }
+  },
+  ranges: [['soGheMin', 'soGheMax']],
+  sort: { maPhong: 'p.MaPhong', soGhe: 'SoGhe' },
+  defaultSort: 'maPhong:asc',
+  tieBreakers: ['p.MaPhong']
+};
+const seatRowOrder = ['CHAR_LENGTH(g.SoHang)', 'g.SoHang'];
+const seatListQuery = {
+  filters: {
+    maGhe: { type: 'exact', column: 'g.MaGhe', maxLength: 15 },
+    soHang: { type: 'exact', column: 'g.SoHang', maxLength: 5 },
+    soGhe: { type: 'integer', column: 'g.SoGhe', min: 1, max: 2147483647 },
+    hang: { type: 'exact', column: 'g.SoHang', maxLength: 5, multiple: true, maxValues: maxSeats },
+    loaiGhe: { type: 'enum', column: 'g.LoaiGhe', values: ['Thuong', 'VIP'], multiple: true }
+  },
+  sort: { viTri: [...seatRowOrder, 'g.SoGhe'] },
+  defaultSort: 'viTri:asc',
+  tieBreakers: ['g.MaGhe']
+};
 
 router.use(requireLogin);
 
@@ -20,6 +47,11 @@ class RoomError extends Error {
 
 function trimmed(value) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeSeatRows(value) {
+  if (Array.isArray(value)) return value.map(normalizeSeatRows);
+  return typeof value === 'string' ? value.trim().toUpperCase() : value;
 }
 
 function readRoom(body) {
@@ -90,13 +122,20 @@ async function saveSeatCount(connection, roomCode, count) {
   await connection.execute('UPDATE PhongChieu SET SoGhe = ? WHERE MaPhong = ?', [count, roomCode]);
 }
 
-router.get('/', async (_req, res) => {
+router.get('/', async (req, res) => {
+  if (typeof req.query.sort === 'string' && req.query.sort.includes(',')) throw new ListQueryError('sort');
+  const { conditions, params, filters, orderBy } = parseListQuery(req.query, roomListQuery);
+  const type = filters.loaiPhong;
+  const where = type ? 'WHERE p.LoaiPhong = ?' : '';
+  const having = conditions.length ? 'HAVING ' + conditions.join(' AND ') : '';
   const [rooms] = await db.execute(`
-    SELECT p.MaPhong, p.TenPhong, p.LoaiPhong, COUNT(g.MaGhe) AS SoGhe
+    SELECT p.MaPhong, p.TenPhong, p.LoaiPhong, ${seatCount} AS SoGhe
     FROM PhongChieu p LEFT JOIN Ghe g ON g.MaPhong = p.MaPhong
+    ${where}
     GROUP BY p.MaPhong, p.TenPhong, p.LoaiPhong
-    ORDER BY p.MaPhong
-  `);
+    ${having}
+    ORDER BY ${orderBy}
+  `, type ? [type, ...params] : params);
   res.json(rooms);
 });
 
@@ -158,15 +197,34 @@ router.delete('/:roomCode', requireAdmin, async (req, res) => {
 });
 
 router.get('/:roomCode/ghe', async (req, res) => {
-  const [rows] = await db.execute(`
-    SELECT g.MaGhe, p.MaPhong, g.SoHang, g.SoGhe, g.LoaiGhe
-    FROM PhongChieu p
-    LEFT JOIN Ghe g ON g.MaPhong = p.MaPhong
-    WHERE p.MaPhong = ?
-    ORDER BY CHAR_LENGTH(g.SoHang), g.SoHang, g.SoGhe, g.MaGhe
-  `, [req.params.roomCode]);
-  if (!rows.length) throw new RoomError(404, 'Không tìm thấy phòng chiếu.');
-  res.json(rows[0].MaGhe === null ? [] : rows);
+  if (req.query.sort !== undefined) throw new ListQueryError('sort');
+  const query = {
+    ...req.query,
+    hang: normalizeSeatRows(req.query.hang),
+    soHang: normalizeSeatRows(req.query.soHang)
+  };
+  const { conditions, params, orderBy } = parseListQuery(query, seatListQuery);
+  const result = await withConsistentListRead(db, async connection => {
+    const [[room]] = await connection.execute('SELECT MaPhong FROM PhongChieu WHERE MaPhong = ?', [req.params.roomCode]);
+    if (!room) throw new RoomError(404, 'Không tìm thấy phòng chiếu.');
+
+    const [rowCounts] = await connection.execute(`
+      SELECT g.SoHang, COUNT(*) AS total FROM Ghe g WHERE g.MaPhong = ?
+      GROUP BY g.SoHang ORDER BY ${seatRowOrder.join(', ')}
+    `, [room.MaPhong]);
+    const totalRoomSeats = rowCounts.reduce((sum, row) => sum + Number(row.total), 0);
+    const rows = rowCounts.map(row => row.SoHang);
+    if (!totalRoomSeats) return { items: [], total: 0, totalRoomSeats, rows };
+
+    const [items] = await connection.execute(`
+      SELECT g.MaGhe, ? AS MaPhong, g.SoHang, g.SoGhe, g.LoaiGhe
+      FROM Ghe g
+      WHERE ${['g.MaPhong = ?', ...conditions].join(' AND ')}
+      ORDER BY ${orderBy}
+    `, [room.MaPhong, room.MaPhong, ...params]);
+    return { items, total: items.length, totalRoomSeats, rows };
+  });
+  res.json(result);
 });
 
 router.post('/:roomCode/ghe', async (req, res) => {
@@ -216,6 +274,7 @@ router.delete('/:roomCode/ghe/:seatCode', requireAdmin, async (req, res) => {
 });
 
 router.use((error, req, res, next) => {
+  if (error instanceof ListQueryError) return res.status(error.status).json({ code: error.code, message: error.message });
   if (error instanceof RoomError) return res.status(error.status).json({ message: error.message });
   const isSeat = req.route?.path.includes('/ghe');
   if (error.code === 'ER_DUP_ENTRY') {

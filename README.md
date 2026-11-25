@@ -32,6 +32,8 @@ WHERE TenDangNhap = 'admin_demo';
 
 Sau khi đăng nhập, chọn **Phòng chiếu và ghế** trong thanh điều hướng. Nhân viên có thể thêm và sửa phòng hoặc ghế. Quản trị viên có thêm quyền xóa.
 
+- Lọc danh sách phòng theo loại 2D/3D và khoảng sức chứa thực, rồi sắp theo mã phòng hoặc số ghế.
+- Chọn phòng để tra mã ghế chính xác hoặc vị trí theo hàng và số. Có thể lọc nhiều hàng và loại ghế. Danh sách ghế hiển thị số ghế khớp và tổng sức chứa của phòng.
 - Khi tạo phòng, nhập **Ghế mỗi hàng** để chia ghế theo hàng A, B, …, Z, AA, … Để trống để xếp tất cả ghế vào hàng A. Số ghế của phòng được cập nhật khi thêm hoặc xóa ghế.
 - Ghế tạo tự động và ghế thêm thủ công đều dùng chung dãy mã `G001`, `G002`, … cho toàn bộ rạp. Mã mới tiếp theo mã số lớn nhất đang có.
 - Số ghế trống được tính theo vé của từng suất chiếu. Vé đã hủy giải phóng chỗ.
@@ -75,7 +77,7 @@ Tạo một schema mới nếu cần thử toàn bộ bộ dữ liệu. Chạy t
 
 Chạy `test_function.sql` để đối chiếu T26 trên schema mới và `NormalQuery.sql` để đối chiếu T33. Nếu dùng dữ liệu mẫu từ phiên bản trước, suất `T26_DAY` có thể vẫn còn 1 ghế trống theo dữ liệu vé đã nạp. Cấu hình ứng dụng chạy cục bộ trên `127.0.0.1`. Phiên đăng nhập sẽ hết khi khởi động lại Node.js.
 
-Các kiểm thử tích hợp G2 và G5 dùng kết nối MySQL cục bộ từ `.env`. Bộ kiểm thử tạo và dọn các schema thử riêng.
+Các kiểm thử tích hợp G2, G5 và G6 dùng kết nối MySQL cục bộ từ `.env`. Bộ kiểm thử tạo và dọn các schema thử riêng.
 
 ```powershell
 $env:G2_TEST_MYSQL = '1'
@@ -83,4 +85,7 @@ node --env-file=.env --test test/g2.integration.test.cjs
 
 $env:G5_TEST_MYSQL = '1'
 node --env-file=.env --test test/g5.integration.test.cjs
+
+$env:G6_TEST_MYSQL = '1'
+node --env-file=.env --test test/g6.integration.test.cjs
 ```

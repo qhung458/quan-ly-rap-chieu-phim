@@ -1,4 +1,4 @@
-/* global jQuery */
+/* global jQuery, ListQuery */
 (() => {
   if (!window.jQuery) return;
 
@@ -6,12 +6,17 @@
   const api = '/api/phong-chieu';
   const $roomForm = $('#room-form');
   const $seatForm = $('#seat-form');
+  const $roomFilter = $('#room-filter-form');
+  const $seatFilter = $('#seat-filter-form');
+  const $seatRowOptions = $('#seat-row-options');
   const $roomRows = $('#room-rows');
   const $seatRows = $('#seat-rows');
   const $roomMessage = $('#room-message');
   const $seatMessage = $('#seat-message');
   const $roomSeatCount = $('#room-seat-count');
   const $seatsPerRow = $('#room-seats-per-row');
+  const fetchRooms = ListQuery.loadFrom(api);
+  const fetchRoomOptions = ListQuery.loadFrom(api + '/tuy-chon');
 
   let user;
   let rooms = [];
@@ -22,19 +27,29 @@
   let seatMode = '';
   let roomsLoading = false;
   let seatsLoading = false;
+  let roomsError = '';
+  let seatsError = '';
   let saving = false;
-  let seatRequest = 0;
+  let roomRequest;
+  let seatRequest;
+  let roomCodeRequest;
+  let roomFilters = {};
+  let seatFilters = {};
 
   function showMessage($element, message, isError = false) {
     $element.toggleClass('text-danger', isError).text(message);
   }
 
-  function showError($element, xhr) {
-    if (xhr.status === 401) {
+  function errorText(error, fallback = 'Không kết nối được máy chủ.') {
+    return error?.responseJSON?.message || error?.message || fallback;
+  }
+
+  function showError($element, error) {
+    if (error.status === 401) {
       location.assign('dang-nhap.html');
       return;
     }
-    showMessage($element, xhr.responseJSON?.message || 'Không kết nối được máy chủ.', true);
+    showMessage($element, errorText(error), true);
   }
 
   function emptyRow($body, colspan, message) {
@@ -74,6 +89,8 @@
       .prop('disabled', !canManageSeats || !seat || seatMode === 'add');
     $('#delete-seat').prop('disabled', !canManageSeats || !canDelete || !seat || Boolean(seatMode));
     $('#clear-seat').prop('disabled', !canManageSeats || (!seat && !seatMode));
+    $roomFilter.children('fieldset').prop('disabled', !user || saving);
+    $seatFilter.children('fieldset').prop('disabled', !room || saving);
   }
 
   function recordRow(code, kind, active, values) {
@@ -91,8 +108,14 @@
 
   function renderRooms() {
     $roomRows.empty();
-    $('#room-count').text(rooms.length + ' phòng');
-    if (!rooms.length) emptyRow($roomRows, 4, 'Chưa có phòng chiếu.');
+    $('#room-count').text(roomsLoading || roomsError ? '' : rooms.length + ' phòng');
+    if (roomsLoading) return emptyRow($roomRows, 4, 'Đang tải phòng chiếu…');
+    if (roomsError) return emptyRow($roomRows, 4, roomsError);
+    if (!rooms.length) {
+      const filtered = roomFilters.loaiPhong || roomFilters.soGheMin || roomFilters.soGheMax;
+      return emptyRow($roomRows, 4, filtered
+        ? 'Không có phòng đáp ứng loại và sức chứa đã chọn.' : 'Chưa có phòng chiếu.');
+    }
     for (const item of rooms) {
       $roomRows.append(recordRow(item.MaPhong, 'room', item.MaPhong === room?.MaPhong,
         [item.TenPhong, item.SoGhe, item.LoaiPhong]));
@@ -101,9 +124,13 @@
 
   function renderSeats() {
     $seatRows.empty();
-    $('#seat-count').text(room ? seats.length + ' ghế' : '');
+    $('#seat-count').text(room && !seatsLoading && !seatsError ? `${seats.length} / ${room.SoGhe} ghế` : '');
     if (!room) return emptyRow($seatRows, 5, 'Chọn một phòng để xem danh sách ghế.');
-    if (!seats.length) emptyRow($seatRows, 5, 'Phòng này chưa có ghế.');
+    if (seatsLoading) return emptyRow($seatRows, 5, 'Đang tải ghế…');
+    if (seatsError) return emptyRow($seatRows, 5, seatsError);
+    if (!seats.length) {
+      return emptyRow($seatRows, 5, room.SoGhe ? 'Không tìm thấy ghế phù hợp.' : 'Phòng này chưa có ghế.');
+    }
     for (const item of seats) {
       $seatRows.append(recordRow(item.MaGhe, 'seat', item.MaGhe === seat?.MaGhe,
         [item.MaPhong, item.SoHang, item.SoGhe, item.LoaiGhe === 'VIP' ? 'VIP' : 'Thường']));
@@ -111,7 +138,9 @@
   }
 
   function showRoom(item) {
-    room = item;
+    roomCodeRequest?.abort();
+    roomCodeRequest = null;
+    room = item ? { ...item } : null;
     roomMode = '';
     $roomForm[0].reset();
     $('#room-id').val(room?.MaPhong ?? '');
@@ -135,48 +164,93 @@
     syncControls();
   }
 
-  async function loadRooms() {
-    roomsLoading = true;
-    syncControls();
-    $('#room-count').empty();
-    emptyRow($roomRows, 4, 'Đang tải phòng chiếu…');
-    try {
-      rooms = await $.getJSON(api);
-      renderRooms();
-    } catch (xhr) {
-      emptyRow($roomRows, 4, 'Không tải được danh sách phòng. Chọn Làm mới để thử lại.');
-      showError($roomMessage, xhr);
-    } finally {
-      roomsLoading = false;
-      syncControls();
+  function readFilters(form) {
+    const query = {};
+    for (const [field, value] of new FormData(form)) {
+      const term = value.trim();
+      if (!term) continue;
+      query[field] = Object.hasOwn(query, field) ? [].concat(query[field], term) : term;
+    }
+    return query;
+  }
+
+  function renderSeatRowOptions(rows) {
+    const options = $seatRowOptions.find('input').get();
+    const selected = new Set(options.filter(input => input.checked).map(input => input.value));
+    const labels = [...new Set([...rows, ...selected, ...[].concat(seatFilters.hang ?? [])])];
+    if (labels.length === options.length && labels.every((label, index) => label === options[index].value)) return;
+    const focused = options.includes(document.activeElement) ? document.activeElement.value : null;
+    $seatRowOptions.empty();
+    for (const row of labels) {
+      const $check = $('<input>', { class: 'form-check-input', type: 'checkbox', name: 'hang', value: row })
+        .prop('checked', selected.has(row));
+      $seatRowOptions.append($('<label>').append($check, document.createTextNode(' ' + row)));
+      if (row === focused) $check.trigger('focus');
     }
   }
 
-  async function loadSeats(selectedCode) {
-    const request = ++seatRequest;
-    seats = [];
-    seatsLoading = Boolean(room);
-    showSeat(null);
-    if (!room) return renderSeats();
-
-    $('#seat-count').empty();
-    emptyRow($seatRows, 5, 'Đang tải ghế…');
+  async function loadRooms() {
+    roomRequest?.abort();
+    const request = new AbortController();
+    roomRequest = request;
+    roomsLoading = true;
+    roomsError = '';
+    renderRooms();
+    syncControls();
     try {
-      const rows = await $.getJSON(roomUrl() + '/ghe');
+      const items = await fetchRooms(roomFilters, { signal: request.signal });
+      if (request === roomRequest) rooms = items;
+    } catch (error) {
+      if (request !== roomRequest) return;
+      if (error.status === 401) location.assign('dang-nhap.html');
+      roomsError = errorText(error, 'Không tải được danh sách phòng. Hãy áp dụng lại bộ lọc.');
+    } finally {
+      if (request === roomRequest) {
+        roomRequest = null;
+        roomsLoading = false;
+        renderRooms();
+        syncControls();
+      }
+    }
+  }
+
+  async function loadSeats() {
+    seatRequest?.abort();
+    const request = room ? new AbortController() : null;
+    seatRequest = request;
+    seats = [];
+    seatsError = '';
+    seatsLoading = Boolean(request);
+    renderSeats();
+    syncControls();
+    if (!request) return;
+
+    try {
+      const result = await ListQuery.loadFrom(roomUrl() + '/ghe')(seatFilters, { signal: request.signal });
       if (request !== seatRequest) return;
-      seats = rows;
-      room.SoGhe = seats.length;
-      if (!roomMode) $roomSeatCount.val(room.SoGhe);
-      renderRooms();
-      showSeat(seats.find(item => item.MaGhe === selectedCode) ?? null);
-      renderSeats();
-    } catch (xhr) {
+      seats = result.items;
+      room.SoGhe = result.totalRoomSeats;
+      $roomSeatCount.val(room.SoGhe);
+      renderSeatRowOptions(result.rows);
+      if (seat && !seatMode) {
+        const current = seats.find(item => item.MaGhe === seat.MaGhe);
+        if (current || !Object.keys(seatFilters).length) showSeat(current ?? null);
+      }
+    } catch (error) {
       if (request !== seatRequest) return;
-      emptyRow($seatRows, 5, 'Không tải được ghế. Chọn lại phòng để thử lại.');
-      showError($seatMessage, xhr);
+      if (error.status === 401) location.assign('dang-nhap.html');
+      if (error.status === 404) {
+        selectRoom(null);
+        showMessage($roomMessage, errorText(error, 'Không tìm thấy phòng chiếu.'), true);
+        await loadRooms();
+        return;
+      }
+      seatsError = errorText(error, 'Không tải được danh sách ghế. Hãy áp dụng lại bộ lọc.');
     } finally {
       if (request === seatRequest) {
+        seatRequest = null;
         seatsLoading = false;
+        renderSeats();
         syncControls();
       }
     }
@@ -204,11 +278,44 @@
   }
 
   function selectRoom(item) {
+    const changed = item?.MaPhong !== room?.MaPhong;
     showMessage($roomMessage, '');
     showMessage($seatMessage, '');
     showRoom(item);
+    if (changed) {
+      seatFilters = {};
+      $seatFilter[0].reset();
+      $seatRowOptions.empty();
+    }
+    showSeat(null);
     return loadSeats();
   }
+
+  $roomFilter.on('submit', event => {
+    event.preventDefault();
+    if (!user || saving) return;
+    roomFilters = readFilters(event.currentTarget);
+    loadRooms();
+  });
+
+  $('#room-filter-reset').on('click', () => {
+    $roomFilter[0].reset();
+    roomFilters = {};
+    loadRooms();
+  });
+
+  $seatFilter.on('submit', event => {
+    event.preventDefault();
+    if (!room || saving) return;
+    seatFilters = readFilters(event.currentTarget);
+    loadSeats();
+  });
+
+  $('#seat-filter-reset').on('click', () => {
+    $seatFilter[0].reset();
+    seatFilters = {};
+    loadSeats();
+  });
 
   $roomRows.on('click', 'tr[data-room-id]', function () {
     if (!saving && !roomsLoading) selectRoom(rooms.find(item => item.MaPhong === this.dataset.roomId));
@@ -221,17 +328,35 @@
     renderSeats();
   });
 
+  async function suggestRoomCode() {
+    const request = new AbortController();
+    roomCodeRequest = request;
+    showMessage($roomMessage, 'Đang lấy gợi ý mã phòng…');
+    try {
+      const options = await fetchRoomOptions({}, { signal: request.signal });
+      if (request !== roomCodeRequest) return;
+      const used = new Set(options.map(item => item.MaPhong.toUpperCase()));
+      let number = 1;
+      const code = () => 'PC' + String(number).padStart(2, '0');
+      while (used.has(code())) number++;
+      if (!$('#room-id').val()) $('#room-id').val(code());
+      showMessage($roomMessage, '');
+    } catch (error) {
+      if (request !== roomCodeRequest) return;
+      if (error.status === 401) location.assign('dang-nhap.html');
+      else showMessage($roomMessage, 'Không lấy được gợi ý mã phòng. Hãy nhập mã phòng.', true);
+    } finally {
+      if (request === roomCodeRequest) roomCodeRequest = null;
+    }
+  }
+
   $('#add-room').on('click', () => {
     selectRoom(null);
-    let number = 1;
-    const used = new Set(rooms.map(item => item.MaPhong.toUpperCase()));
-    const suggestedCode = () => 'PC' + String(number).padStart(2, '0');
-    while (used.has(suggestedCode())) number++;
     roomMode = 'add';
-    $('#room-id').val(suggestedCode());
     $roomSeatCount.val(20).trigger('input');
     syncControls();
     $('#room-name').trigger('focus');
+    suggestRoomCode();
   });
 
   $roomSeatCount.on('input', function () {
@@ -253,25 +378,23 @@
       LoaiPhong: $('#room-type').val()
     };
     if (adding) {
+      roomCodeRequest?.abort();
+      roomCodeRequest = null;
       payload.MaPhong = $('#room-id').val();
       payload.SoGhe = Number($roomSeatCount.val());
       if ($seatsPerRow.val() !== '') payload.SoGheMoiHang = Number($seatsPerRow.val());
     }
     change(adding ? 'POST' : 'PUT', adding ? api : roomUrl(), payload, $roomMessage, async saved => {
-      rooms = rooms.filter(item => item.MaPhong !== saved.MaPhong);
-      rooms.push(saved);
-      rooms.sort((a, b) => a.MaPhong.localeCompare(b.MaPhong));
-      showRoom(saved);
+      const selected = adding ? selectRoom(saved) : showRoom(saved);
       showMessage($roomMessage, adding ? 'Đã thêm phòng và ' + saved.SoGhe + ' ghế.' : 'Đã cập nhật phòng.');
-      if (adding) await loadSeats();
+      await Promise.all([loadRooms(), selected]);
     });
   });
 
   $('#delete-room').on('click', () => {
     if (!room || saving || !window.confirm('Xóa phòng ' + room.MaPhong + ' và toàn bộ ghế trong phòng?')) return;
     change('DELETE', roomUrl(), null, $roomMessage, async () => {
-      rooms = rooms.filter(item => item.MaPhong !== room.MaPhong);
-      await selectRoom(null);
+      await Promise.all([selectRoom(null), loadRooms()]);
       showMessage($roomMessage, 'Đã xóa phòng và các ghế thuộc phòng.');
     });
   });
@@ -316,16 +439,18 @@
       LoaiGhe: $('#seat-type').val()
     };
     change(adding ? 'POST' : 'PUT', adding ? roomUrl() + '/ghe' : seatUrl(), payload, $seatMessage, async saved => {
+      showSeat(saved);
       showMessage($seatMessage, adding ? 'Đã thêm ghế.' : 'Đã cập nhật ghế.');
-      await loadSeats(saved.MaGhe);
+      await Promise.all([loadSeats(), loadRooms()]);
     });
   });
 
   $('#delete-seat').on('click', () => {
     if (!seat || saving || !window.confirm('Xóa ghế ' + seat.MaGhe + '?')) return;
     change('DELETE', seatUrl(), null, $seatMessage, async () => {
+      showSeat(null);
       showMessage($seatMessage, 'Đã xóa ghế.');
-      await loadSeats();
+      await Promise.all([loadSeats(), loadRooms()]);
     });
   });
 

@@ -162,6 +162,37 @@
                 role="status"
               ></span>
             </div>
+            <form id="room-filter-form" class="room-seat-query">
+              <fieldset disabled aria-label="Lọc và sắp xếp phòng chiếu">
+                <div class="room-seat-query-fields">
+                  <label>Loại phòng
+                    <select class="form-select form-select-sm" name="loaiPhong">
+                      <option value="">Tất cả</option>
+                      <option value="2D">2D</option>
+                      <option value="3D">3D</option>
+                    </select>
+                  </label>
+                  <label>Số ghế từ
+                    <input class="form-control form-control-sm" name="soGheMin" type="number" min="0" />
+                  </label>
+                  <label>Số ghế đến
+                    <input class="form-control form-control-sm" name="soGheMax" type="number" min="0" />
+                  </label>
+                  <label>Sắp xếp
+                    <select class="form-select form-select-sm" name="sort">
+                      <option value="maPhong:asc">Mã phòng tăng dần</option>
+                      <option value="maPhong:desc">Mã phòng giảm dần</option>
+                      <option value="soGhe:asc">Số ghế tăng dần</option>
+                      <option value="soGhe:desc">Số ghế giảm dần</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                  <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
+                  <button class="btn btn-outline-secondary btn-sm" id="room-filter-reset" type="button">Đặt lại</button>
+                </div>
+              </fieldset>
+            </form>
             <div class="table-responsive">
               <table
                 class="table align-middle room-table mb-0"
@@ -287,6 +318,36 @@
                 role="status"
               ></span>
             </div>
+            <form id="seat-filter-form" class="room-seat-query">
+              <fieldset disabled aria-label="Tìm và lọc ghế của phòng">
+                <div class="room-seat-query-fields">
+                  <label>Mã ghế chính xác
+                    <input class="form-control form-control-sm" name="maGhe" type="search" maxlength="15" />
+                  </label>
+                  <label>Hàng chính xác
+                    <input class="form-control form-control-sm" name="soHang" type="text" maxlength="5" />
+                  </label>
+                  <label>Số ghế
+                    <input class="form-control form-control-sm" name="soGhe" type="number" min="1" max="2147483647" />
+                  </label>
+                </div>
+                <fieldset class="room-seat-check-group">
+                  <legend>Lọc theo hàng</legend>
+                  <div id="seat-row-options" class="room-seat-check-options"></div>
+                </fieldset>
+                <fieldset class="room-seat-check-group">
+                  <legend>Loại ghế</legend>
+                  <div class="room-seat-check-options">
+                    <label><input class="form-check-input" type="checkbox" name="loaiGhe" value="Thuong" /> Thường</label>
+                    <label><input class="form-check-input" type="checkbox" name="loaiGhe" value="VIP" /> VIP</label>
+                  </div>
+                </fieldset>
+                <div class="d-flex flex-wrap gap-2">
+                  <button class="btn btn-dark btn-sm" type="submit">Áp dụng</button>
+                  <button class="btn btn-outline-secondary btn-sm" id="seat-filter-reset" type="button">Đặt lại</button>
+                </div>
+              </fieldset>
+            </form>
             <div class="table-responsive">
               <table
                 class="table align-middle room-table mb-0"
@@ -317,6 +378,7 @@
       integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
       crossorigin="anonymous"
     ></script>
+    <script src="../js/truy-van-danh-sach.js"></script>
     <script src="../js/phong-chieu-va-ghe.js"></script>
   </body>
 </html>
