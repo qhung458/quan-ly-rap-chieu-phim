@@ -2,7 +2,9 @@ const express = require('express');
 const db = require('./db.cjs');
 const { requireLogin, requireAdmin } = require('./auth.cjs');
 const { ListQueryError, parseListPagination, parseListQuery, vietnameseSearchColumn } = require('./list-query.cjs');
-const { withConsistentListRead } = require('./list-snapshots.cjs');
+const { SnapshotError, withConsistentListRead } = require('./list-snapshots.cjs');
+const { createSnapshotList } = require('./snapshot-list.cjs');
+const snapshotStore = require('./snapshot-store.cjs');
 
 const router = express.Router();
 const fields = 'MaKhachHang, TenKhachHang, SoDienThoai, Email';
@@ -27,27 +29,86 @@ function readCustomer(body) {
   return { TenKhachHang: name, SoDienThoai: phone, Email: email };
 }
 
-router.get('/', async (req, res) => {
-  const keyword = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
-  const [rows] = await db.execute(
-    `SELECT ${fields}
-     FROM KhachHang
-     WHERE LOCATE(?, MaKhachHang) > 0 OR LOCATE(?, TenKhachHang) > 0
-        OR LOCATE(?, SoDienThoai) > 0 OR LOCATE(?, Email) > 0
-     ORDER BY MaKhachHang`,
-    [keyword, keyword, keyword, keyword]
-  );
-  res.json(rows);
+const nameSearch = vietnameseSearchColumn('k.TenKhachHang');
+const customerSearch = {
+  accentInsensitive: true,
+  searchColumns: [vietnameseSearchColumn('k.MaKhachHang'), nameSearch],
+  phoneColumn: 'k.SoDienThoai'
+};
+const emailText = "REGEXP_REPLACE(CONVERT(k.Email USING utf8mb4), '^[[:space:]\ufeff]+|[[:space:]\ufeff]+$', '')";
+
+const customerList = createSnapshotList({
+  store: snapshotStore,
+  pool: db,
+  scope: 'khach-hang',
+  query: {
+    ...customerSearch,
+    searchColumns: [...customerSearch.searchColumns, vietnameseSearchColumn('k.Email')],
+    filters: {
+      maKhachHang: { type: 'exact', column: 'k.MaKhachHang', maxLength: 10 },
+      ten: { type: 'text', column: nameSearch, operator: 'contains' },
+      soDienThoai: { type: 'phone', column: 'k.SoDienThoai' },
+      email: { type: 'exact' },
+      coEmail: { type: 'boolean' },
+      veTuNgay: { type: 'date' },
+      veDenNgay: { type: 'date' }
+    },
+    ranges: [['veTuNgay', 'veDenNgay']],
+    sort: {
+      maKhachHang: 'k.MaKhachHang',
+      ten: 'CONVERT(k.TenKhachHang USING utf8mb4) COLLATE utf8mb4_vi_0900_ai_ci'
+    },
+    defaultSort: 'maKhachHang:asc',
+    tieBreakers: ['k.MaKhachHang']
+  },
+  async load(connection, { filters, conditions, params, orderBy }) {
+    if (filters.email) {
+      conditions.push(`CAST(LOWER(${emailText}) AS BINARY) = CAST(LOWER(CONVERT(? USING utf8mb4)) AS BINARY)`);
+      params.push(filters.email);
+    }
+    if (filters.coEmail !== undefined) {
+      conditions.push(`COALESCE(${emailText}, '') ${filters.coEmail ? '<>' : '='} ''`);
+    }
+    if (filters.veTuNgay || filters.veDenNgay) {
+      const ticketConditions = ["v.MaKhachHang = k.MaKhachHang", "v.TrangThai IN ('DaDat', 'DaSuDung')"];
+      if (filters.veTuNgay) {
+        ticketConditions.push('v.NgayDat >= ?');
+        params.push(filters.veTuNgay);
+      }
+      if (filters.veDenNgay && filters.veDenNgay !== '9999-12-31') {
+        ticketConditions.push('v.NgayDat < DATE_ADD(?, INTERVAL 1 DAY)');
+        params.push(filters.veDenNgay);
+      }
+      conditions.push(`EXISTS (SELECT 1 FROM Ve v WHERE ${ticketConditions.join(' AND ')})`);
+    }
+    const [items] = await connection.execute(`
+      SELECT k.MaKhachHang, k.TenKhachHang, k.SoDienThoai, k.Email
+      FROM KhachHang k
+      ${conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''}
+      ORDER BY ${orderBy}
+    `, params);
+    return { items };
+  },
+  workbook: ({ items }) => ({
+    filename: 'khach-hang',
+    sheets: [{
+      name: 'Khách hàng',
+      columns: [['Mã khách hàng', 18], ['Họ và tên', 30], ['Số điện thoại', 20, '@'], ['Email', 38]],
+      rows: items.map(customer => [customer.MaKhachHang, customer.TenKhachHang, customer.SoDienThoai, customer.Email])
+    }]
+  })
 });
 
 const lookupQuery = {
-  searchColumns: ['MaKhachHang', 'TenKhachHang'].map(vietnameseSearchColumn),
-  phoneColumn: 'SoDienThoai',
-  filters: { ma: { type: 'exact', column: 'MaKhachHang', maxLength: 10 } },
-  sort: { ma: 'MaKhachHang' },
+  ...customerSearch,
+  filters: { ma: { type: 'exact', column: 'k.MaKhachHang', maxLength: 10 } },
+  sort: { ma: 'k.MaKhachHang' },
   defaultSort: 'ma:asc',
-  tieBreakers: ['MaKhachHang']
+  tieBreakers: ['k.MaKhachHang']
 };
+
+router.get('/', customerList.list);
+router.get('/xuat', customerList.exportXlsx);
 
 router.get('/tuy-chon', async (req, res) => {
   const { page: requestedPage, pageSize: requestedPageSize = '20', ...query } = req.query;
@@ -58,11 +119,11 @@ router.get('/tuy-chon', async (req, res) => {
     if (filters.ma && conditions.length > 1) throw new ListQueryError('ma/q');
     const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
     const { items, total } = await withConsistentListRead(db, async connection => {
-      const [[count]] = await connection.execute(`SELECT COUNT(*) AS total FROM KhachHang ${where}`, params);
+      const [[count]] = await connection.execute(`SELECT COUNT(*) AS total FROM KhachHang k ${where}`, params);
       const total = Number(count.total);
       if (page > Math.ceil(total / pageSize)) return { items: [], total };
       const [items] = await connection.execute(`
-        SELECT MaKhachHang, TenKhachHang, SoDienThoai FROM KhachHang ${where}
+        SELECT k.MaKhachHang, k.TenKhachHang, k.SoDienThoai FROM KhachHang k ${where}
         ORDER BY ${orderBy} LIMIT ? OFFSET ?
       `, [...params, pageSize, (page - 1) * pageSize]);
       return { items, total };
@@ -112,20 +173,51 @@ router.delete('/:code', requireAdmin, async (req, res) => {
   res.sendStatus(204);
 });
 
-router.get('/:code/ve', async (req, res) => {
-  const [rows] = await db.execute(`
-    SELECT v.MaVe, p.TenPhim,
-           DATE_FORMAT(v.NgayDat, '%d/%m/%Y %H:%i') AS NgayDat,
-           v.TrangThai
-    FROM KhachHang kh
-    LEFT JOIN Ve v ON v.MaKhachHang = kh.MaKhachHang
-    LEFT JOIN SuatChieu sc ON sc.MaSuatChieu = v.MaSuatChieu
-    LEFT JOIN Phim p ON p.MaPhim = sc.MaPhim
-    WHERE kh.MaKhachHang = ?
-    ORDER BY v.NgayDat DESC, v.MaVe, v.MaSuatChieu, v.MaGhe
-  `, [req.params.code]);
-  if (!rows.length) return res.status(404).json(notFound);
-  res.json(rows[0].MaVe === null ? [] : rows);
+const movieSearch = vietnameseSearchColumn('p.TenPhim');
+const historyList = createSnapshotList({
+  store: snapshotStore,
+  pool: db,
+  scope: req => 'khach-hang:ve:' + req.params.code,
+  query: {
+    accentInsensitive: true,
+    searchColumns: [vietnameseSearchColumn('v.MaVe'), movieSearch],
+    filters: {
+      maVe: { type: 'exact', column: 'v.MaVe', maxLength: 15 },
+      tenPhim: { type: 'text', column: movieSearch, operator: 'contains', maxLength: 150 },
+      maPhim: { type: 'exact', column: 'p.MaPhim', multiple: true, maxLength: 15 },
+      trangThai: { type: 'enum', column: 'v.TrangThai', multiple: true, values: ['DaDat', 'DaSuDung', 'DaHuy'] },
+      tuNgay: { type: 'date', column: 'v.NgayDat', operator: '>=' },
+      denNgay: { type: 'date', column: 'v.NgayDat', operator: 'throughDate' }
+    },
+    ranges: [['tuNgay', 'denNgay']],
+    sort: { ngayDat: 'v.NgayDat' },
+    defaultSort: 'ngayDat:desc',
+    tieBreakers: ['v.MaVe', 'v.MaSuatChieu', 'v.MaKhachHang', 'v.MaGhe']
+  },
+  async load(connection, { conditions, params, orderBy }, req) {
+    const code = req.params.code;
+    const [[customer]] = await connection.execute(`
+      SELECT EXISTS (SELECT 1 FROM Ve v WHERE v.MaKhachHang = k.MaKhachHang) AS hasHistory
+      FROM KhachHang k
+      WHERE k.MaKhachHang = ?
+    `, [code]);
+    if (!customer) throw new SnapshotError(404, 'CUSTOMER_NOT_FOUND', notFound.message);
+    const meta = { hasHistory: Boolean(customer.hasHistory) };
+    if (!meta.hasHistory) return { items: [], meta };
+
+    const [items] = await connection.execute(`
+      SELECT v.MaVe, v.MaSuatChieu, v.MaGhe, p.MaPhim, p.TenPhim,
+             DATE_FORMAT(v.NgayDat, '%d/%m/%Y %H:%i') AS NgayDat, v.TrangThai
+      FROM Ve v
+      JOIN SuatChieu sc ON sc.MaSuatChieu = v.MaSuatChieu
+      JOIN Phim p ON p.MaPhim = sc.MaPhim
+      WHERE ${['v.MaKhachHang = ?', ...conditions].join(' AND ')}
+      ORDER BY ${orderBy}
+    `, [code, ...params]);
+    return { items, meta };
+  }
 });
+
+router.get('/:code/ve', historyList.list);
 
 module.exports = router;

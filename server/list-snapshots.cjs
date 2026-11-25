@@ -19,7 +19,7 @@ function copyValue(encoded) {
   return deserialize(Buffer.from(encoded));
 }
 
-function encodeProjection(items, report, byteLimit) {
+function encodeProjection(items, report, meta, byteLimit) {
   // Keep one packed buffer and an index so a page need only decode its own rows.
   const indexBytes = (items.length + 1) * Uint32Array.BYTES_PER_ELEMENT;
   if (indexBytes > byteLimit) throw snapshotTooLarge();
@@ -35,9 +35,10 @@ function encodeProjection(items, report, byteLimit) {
   }
 
   const encodedReport = report === undefined ? undefined : serialize(report);
-  const bytes = rowBytes + offsets.byteLength + (encodedReport?.length ?? 0);
+  const encodedMeta = meta === undefined ? undefined : serialize(meta);
+  const bytes = rowBytes + offsets.byteLength + (encodedReport?.length ?? 0) + (encodedMeta?.length ?? 0);
   if (bytes > byteLimit) throw snapshotTooLarge();
-  return { data: Buffer.concat(rows, rowBytes), offsets, report: encodedReport, bytes };
+  return { data: Buffer.concat(rows, rowBytes), offsets, report: encodedReport, meta: encodedMeta, bytes };
 }
 
 function readItems({ data, offsets }, start, end) {
@@ -46,6 +47,10 @@ function readItems({ data, offsets }, start, end) {
     items.push(copyValue(data.subarray(offsets[index], offsets[index + 1])));
   }
   return items;
+}
+
+function readMeta(snapshot) {
+  return snapshot.meta ? { meta: copyValue(snapshot.meta) } : {};
 }
 
 function createSnapshotStore({
@@ -90,7 +95,7 @@ function createSnapshotStore({
     return new SnapshotError(503, 'SNAPSHOT_STORE_FULL', 'Tạm thời chưa thể lưu kết quả. Vui lòng thử lại sau.');
   }
 
-  function create({ sessionId, scope, items, report }) {
+  function create({ sessionId, scope, items, report, meta }) {
     if (typeof sessionId !== 'string' || !sessionId || typeof scope !== 'string' || !scope || !Array.isArray(items)) {
       throw new TypeError('A snapshot needs a sessionId, a scope and an items array');
     }
@@ -99,7 +104,7 @@ function createSnapshotStore({
     removeExpired(time);
     if (snapshots.size >= maxSnapshots) throw storeFull();
 
-    const encoded = encodeProjection(items, report, maxSnapshotBytes);
+    const encoded = encodeProjection(items, report, meta, maxSnapshotBytes);
     if (retainedBytes + encoded.bytes > maxTotalBytes) throw storeFull();
     const id = randomUUID();
     snapshots.set(id, { ...encoded, sessionId, scope, expiresAt: time + ttlMs, total: items.length });
@@ -117,14 +122,15 @@ function createSnapshotStore({
     }
     const start = (page - 1) * pageSize;
     const items = readItems(snapshot, start, Math.min(start + pageSize, snapshot.total));
-    return { snapshotId, items, total: snapshot.total, page, pageSize };
+    return { snapshotId, items, total: snapshot.total, page, pageSize, ...readMeta(snapshot) };
   }
 
   function read(snapshotId, access) {
     const snapshot = find(snapshotId, access);
     return {
       items: readItems(snapshot, 0, snapshot.total),
-      report: snapshot.report ? copyValue(snapshot.report) : undefined
+      report: snapshot.report ? copyValue(snapshot.report) : undefined,
+      ...readMeta(snapshot)
     };
   }
 

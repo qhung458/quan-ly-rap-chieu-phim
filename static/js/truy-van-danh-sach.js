@@ -63,7 +63,7 @@ window.ListQuery = (() => {
         draft: copyQuery(draft), applied: copyQuery(applied), status, error,
         items: result ? structuredClone(result.items) : [], total: result?.total ?? 0,
         page: result?.page ?? 1, pageSize: result?.pageSize ?? pageSize,
-        snapshotId: getSnapshotId()
+        snapshotId: getSnapshotId(), meta: structuredClone(result?.meta ?? null)
       };
     }
 
@@ -115,6 +115,17 @@ window.ListQuery = (() => {
       getState, getSnapshotId,
       setDraft(changes) {
         draft = copyQuery({ ...draft, ...changes });
+        onChange(getState());
+      },
+      clear() {
+        const previous = pending;
+        pending = null;
+        previous?.abort();
+        draft = copyQuery(defaultQuery);
+        applied = copyQuery(defaultQuery);
+        status = 'idle';
+        error = null;
+        result = null;
         onChange(getState());
       },
       apply() { return applyQuery(draft); },

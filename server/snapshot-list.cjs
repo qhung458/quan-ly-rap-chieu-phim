@@ -40,7 +40,8 @@ function handleListRequest(run) {
 
 // The route supplies its authorization middleware and a scope that includes any parent
 // record/key. load uses the provided read-only connection, returning the full ordered
-// items and optional report data from the same read. workbook maps that frozen data.
+// items, optional list metadata, and optional report data from the same read.
+// workbook maps that frozen data.
 function createSnapshotList({ store, pool, scope, query, load, workbook, paginated = true }) {
   const list = handleListRequest(async (req, res) => {
     const { page, pageSize, snapshotId: rawId, ...filters } = req.query;
@@ -58,10 +59,14 @@ function createSnapshotList({ store, pool, scope, query, load, workbook, paginat
       snapshotId = store.create({ ...snapshot, ...access });
     }
     if (paginated) return res.json(store.page(snapshotId, access, pagination));
-    const { items } = store.read(snapshotId, access);
-    return res.json({ snapshotId, items, total: items.length, page: 1, pageSize: Math.max(1, items.length) });
+    const { items, meta } = store.read(snapshotId, access);
+    return res.json({
+      snapshotId, items, total: items.length, page: 1, pageSize: Math.max(1, items.length),
+      ...(meta === undefined ? {} : { meta })
+    });
   });
 
+  if (!workbook) return { list };
   const exportXlsx = handleListRequest(async (req, res) => {
     only(req.query, ['snapshotId']);
     const snapshotId = readSnapshotId(req.query.snapshotId);
