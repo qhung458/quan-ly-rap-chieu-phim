@@ -87,19 +87,24 @@ window.ExcelExport = (() => {
       }
     }
     endpoint.searchParams.set('snapshotId', snapshotId);
-    const response = await fetch(endpoint, { credentials: 'same-origin', cache: 'no-store' });
-    if (!response.ok) {
-      const body = await response.json().catch(() => null);
-      const messages = {
-        401: 'Vui lòng đăng nhập lại để xuất Excel.',
-        403: 'Bạn không có quyền xuất dữ liệu này.',
-        410: 'Kết quả đang xem đã hết hạn. Tải lại danh sách trước khi xuất Excel.'
-      };
-      throw new Error(body?.message || messages[response.status] || 'Không thể xuất Excel. Vui lòng thử lại.');
+    const release = window.ListQuery?.protectSnapshot?.(snapshotId);
+    try {
+      const response = await fetch(endpoint, { credentials: 'same-origin', cache: 'no-store' });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const messages = {
+          401: 'Vui lòng đăng nhập lại để xuất Excel.',
+          403: 'Bạn không có quyền xuất dữ liệu này.',
+          410: 'Kết quả đang xem đã hết hạn. Tải lại danh sách trước khi xuất Excel.'
+        };
+        throw new Error(body?.message || messages[response.status] || 'Không thể xuất Excel. Vui lòng thử lại.');
+      }
+      const type = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase();
+      if (type !== mimeType) throw new Error('Máy chủ không trả về tệp Excel hợp lệ.');
+      saveBlob(await response.blob(), filename);
+    } finally {
+      release?.();
     }
-    const type = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase();
-    if (type !== mimeType) throw new Error('Máy chủ không trả về tệp Excel hợp lệ.');
-    saveBlob(await response.blob(), filename);
   }
 
   function bindAction(id, run) {

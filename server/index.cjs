@@ -11,6 +11,9 @@ const showtimes = require('./showtimes.cjs');
 const combos = require('./combos.cjs');
 const invoices = require('./invoices.cjs');
 const stats = require('./stats.cjs');
+const snapshotStore = require('./snapshot-store.cjs');
+const { handleListRequest, readSnapshotId } = require('./snapshot-list.cjs');
+const { ListQueryError } = require('./list-query.cjs');
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -47,6 +50,11 @@ app.get('/api/health', async (_req, res) => {
   await db.execute('SELECT 1');
   res.json({ ok: true });
 });
+app.post('/api/list-snapshots/retire', handleListRequest((req, res) => {
+  if (!Array.isArray(req.body) || req.body.length > 100) throw new ListQueryError('snapshotId');
+  snapshotStore.retire(req.body.map(readSnapshotId), req.sessionID);
+  res.sendStatus(204);
+}));
 app.use('/api/auth', auth);
 app.use('/api/khach-hang', customers);
 app.use('/api/phong-chieu', rooms);

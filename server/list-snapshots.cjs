@@ -70,11 +70,14 @@ function createSnapshotStore({
   const snapshots = new Map();
   let retainedBytes = 0;
 
+  function remove(id, snapshot) {
+    snapshots.delete(id);
+    retainedBytes -= snapshot.bytes;
+  }
+
   function removeExpired(time) {
     for (const [id, snapshot] of snapshots) {
-      if (snapshot.expiresAt > time) continue;
-      snapshots.delete(id);
-      retainedBytes -= snapshot.bytes;
+      if (snapshot.expiresAt <= time) remove(id, snapshot);
     }
   }
 
@@ -95,6 +98,31 @@ function createSnapshotStore({
     return new SnapshotError(503, 'SNAPSHOT_STORE_FULL', 'Tạm thời chưa thể lưu kết quả. Vui lòng thử lại sau.');
   }
 
+  function makeSpace(bytes) {
+    let count = snapshots.size;
+    let totalBytes = retainedBytes;
+    const fits = () => count < maxSnapshots && totalBytes + bytes <= maxTotalBytes;
+    if (fits()) return;
+
+    const unused = [];
+    for (const [id, snapshot] of snapshots) {
+      if (!snapshot.retired) continue;
+      unused.push([id, snapshot]);
+      count--;
+      totalBytes -= snapshot.bytes;
+      if (fits()) break;
+    }
+    if (!fits()) throw storeFull();
+    for (const [id, snapshot] of unused) remove(id, snapshot);
+  }
+
+  function retire(ids, sessionId) {
+    for (const id of ids) {
+      const snapshot = snapshots.get(id);
+      if (snapshot?.sessionId === sessionId) snapshot.retired = true;
+    }
+  }
+
   function create({ sessionId, scope, items, report, meta }) {
     if (typeof sessionId !== 'string' || !sessionId || typeof scope !== 'string' || !scope || !Array.isArray(items)) {
       throw new TypeError('A snapshot needs a sessionId, a scope and an items array');
@@ -102,10 +130,9 @@ function createSnapshotStore({
     if (items.length > maxItems) throw snapshotTooLarge();
     const time = now();
     removeExpired(time);
-    if (snapshots.size >= maxSnapshots) throw storeFull();
 
     const encoded = encodeProjection(items, report, meta, maxSnapshotBytes);
-    if (retainedBytes + encoded.bytes > maxTotalBytes) throw storeFull();
+    makeSpace(encoded.bytes);
     const id = randomUUID();
     snapshots.set(id, { ...encoded, sessionId, scope, expiresAt: time + ttlMs, total: items.length });
     retainedBytes += encoded.bytes;
@@ -134,7 +161,7 @@ function createSnapshotStore({
     };
   }
 
-  return { create, page, read };
+  return { create, page, read, retire };
 }
 
 async function withConsistentListRead(pool, read) {

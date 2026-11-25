@@ -216,6 +216,7 @@ router.get('/', handleListRequest(async (req, res) => {
   }
 
   const { summary, phim, combo } = await withConsistentListRead(db, connection => readPeriod(connection, from, to));
+  if (res.destroyed) return;
   const snapshotId = snapshotStore.create({
     ...access(req), items: [...phim, ...combo], report: { summary, filmCount: phim.length }
   });

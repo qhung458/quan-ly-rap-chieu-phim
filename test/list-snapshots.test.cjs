@@ -100,6 +100,31 @@ test('the store rejects oversized projections and retains active snapshots when 
   assert.deepEqual(byBytes.read(first, access).items, [{ label }]);
 });
 
+test('capacity reclaims only retired snapshots from their owning session', () => {
+  const store = createSnapshotStore({ maxSnapshots: 2 });
+  const other = { ...access, sessionId: 'session-b' };
+  const old = store.create({ ...access, items: [1] });
+  const active = store.create({ ...other, items: [2] });
+
+  store.retire([old], other.sessionId);
+  assert.throws(() => store.create({ ...access, items: [3] }), { code: 'SNAPSHOT_STORE_FULL' });
+  store.retire([old], access.sessionId);
+  assert.deepEqual(store.read(old, access).items, [1]);
+
+  const next = store.create({ ...access, items: [3] });
+  assert.throws(() => store.page(old, access), { code: 'SNAPSHOT_EXPIRED' });
+  assert.deepEqual(store.read(active, other).items, [2]);
+  assert.deepEqual(store.read(next, access).items, [3]);
+});
+
+test('an oversized admission leaves retired snapshots readable when it still cannot fit', () => {
+  const store = createSnapshotStore({ maxSnapshotBytes: 256, maxTotalBytes: 96 });
+  const small = store.create({ ...access, items: [1] });
+  store.retire([small], access.sessionId);
+  assert.throws(() => store.create({ ...access, items: ['x'.repeat(110)] }), { code: 'SNAPSHOT_STORE_FULL' });
+  assert.deepEqual(store.read(small, access).items, [1]);
+});
+
 const isolation = 'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ';
 const start = 'START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY';
 

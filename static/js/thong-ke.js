@@ -16,6 +16,7 @@
   let mode = 'day';
   let periodRequest;
   let exportAvailable = false;
+  const keepPeriodSnapshot = ListQuery.snapshotOwner();
 
   const rankDefinitions = {
     phim: { label: 'phim', code: 'MaPhim', name: 'TenPhim', count: 'SoVe', countLabel: 'Lượt vé', codeLength: 15 },
@@ -188,6 +189,7 @@
     const fields = Array.from(form.querySelectorAll('input[name]'));
     const controller = ListQuery.create({
       defaults: applied,
+      ownsSnapshot: false,
       async load(params, context) {
         const snapshotId = params.snapshotId ?? data.snapshotId;
         const response = await fetchRanking({ ...controller.getState().applied, ...params, snapshotId }, context);
@@ -341,6 +343,7 @@
     const from = $('#stats-from').val();
     const to = $('#stats-to').val();
     if (!from || !to || from > to || Date.parse(to) - Date.parse(from) > 365 * 86400000) {
+      keepPeriodSnapshot(undefined, true);
       clearReport('Chọn khoảng ngày để xem thống kê.');
       $submit.prop('disabled', false);
       $message.addClass('text-danger').text('Chọn khoảng ngày hợp lệ, tối đa 366 ngày.');
@@ -349,17 +352,24 @@
 
     const request = new AbortController();
     periodRequest = request;
+    const retirement = keepPeriodSnapshot(undefined, true);
     clearReport('Đang tải thống kê…');
     $submit.prop('disabled', true);
     $message.text('Đang tải thống kê…');
     try {
-      const result = await loadPeriod({ tuNgay: from, denNgay: to, tomTat: 1 }, { signal: request.signal });
+      if (retirement) await retirement;
       if (request !== periodRequest) return;
+      const result = await loadPeriod({ tuNgay: from, denNgay: to, tomTat: 1 }, { signal: request.signal });
+      if (request !== periodRequest) {
+        ListQuery.retireSnapshots([result?.snapshotId]);
+        return;
+      }
       if (typeof result?.snapshotId !== 'string' || !result.snapshotId || !result.TongQuan ||
           !Array.isArray(result.TheoNgay) || !Array.isArray(result.TheoThang)) {
         throw new Error('Phản hồi kỳ thống kê không hợp lệ.');
       }
       data = result;
+      keepPeriodSnapshot(result.snapshotId);
       renderTiles(result.TongQuan);
       renderPeriod();
       for (const ranking of rankings) ranking.reload();

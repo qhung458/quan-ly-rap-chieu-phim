@@ -77,6 +77,81 @@ test('frontend applies, removes and resets filters independently from draft edit
   assert.equal(states.at(-1), 'ready');
 });
 
+test('snapshot owners retain active downloads and retire only replaced or discarded results', async () => {
+  const sent = [];
+  const listeners = {};
+  const { ListQuery } = browserScript('truy-van-danh-sach.js', { Blob }, {
+    addEventListener(name, handler) { listeners[name] = handler; },
+    navigator: { sendBeacon(url, body) { sent.push({ url, body }); return true; } }
+  });
+  const retired = () => Promise.all(sent.map(async ({ url, body }) => {
+    assert.equal(url, '/api/list-snapshots/retire');
+    assert.equal(body.type, 'application/json');
+    return JSON.parse(await body.text());
+  }));
+  let snapshotNumber = 0;
+  const view = ListQuery.create({
+    load: async params => page(params.snapshotId ?? 'view-' + ++snapshotNumber, params.page)
+  });
+  const shared = ListQuery.create({ ownsSnapshot: false, load: async params => page('period', params.page) });
+  const keepPeriod = ListQuery.snapshotOwner();
+  keepPeriod('period');
+  await shared.apply();
+  shared.clear();
+  await view.apply();
+  await view.goToPage(2);
+  const release = ListQuery.protectSnapshot(view.getSnapshotId());
+  await view.apply();
+  listeners.pagehide({ persisted: true });
+  assert.deepEqual(await retired(), []);
+  release();
+  assert.deepEqual(await retired(), [['view-1']]);
+  view.clear();
+  listeners.pagehide({ persisted: false });
+  assert.deepEqual(await retired(), [['view-1'], ['view-2'], ['period']]);
+});
+
+test('new queries wait for retirement after rapid apply or clear actions', async () => {
+  const initialRetirement = deferred();
+  const latestRetirement = deferred();
+  const retirements = [];
+  const { ListQuery } = browserScript('truy-van-danh-sach.js', {}, {
+    fetch(url, request) {
+      assert.equal(url, '/api/list-snapshots/retire');
+      assert.equal(request.keepalive, true);
+      retirements.push(...JSON.parse(request.body));
+      return (retirements.length === 1 ? initialRetirement : latestRetirement).promise;
+    }
+  });
+  const queries = [];
+  const view = ListQuery.create({
+    load: async params => {
+      queries.push(params.q);
+      return page(params.q, params.page);
+    }
+  });
+  view.setDraft({ q: 'initial' });
+  await view.apply();
+  view.setDraft({ q: 'superseded' });
+  const superseded = view.apply();
+  view.setDraft({ q: 'latest' });
+  const latest = view.apply();
+  assert.deepEqual(queries, ['initial']);
+  initialRetirement.resolve();
+  await Promise.all([superseded, latest]);
+  assert.deepEqual(queries, ['initial', 'latest']);
+  assert.equal(view.getSnapshotId(), 'latest');
+
+  view.clear();
+  view.setDraft({ q: 'after-clear' });
+  const afterClear = view.apply();
+  assert.deepEqual(queries, ['initial', 'latest']);
+  assert.deepEqual(retirements, ['initial', 'latest']);
+  latestRetirement.resolve();
+  await afterClear;
+  assert.equal(view.getSnapshotId(), 'after-clear');
+});
+
 test('frontend ignores late successes and errors and exposes the snapshot of the winning request', async () => {
   const { ListQuery } = browserScript('truy-van-danh-sach.js');
   const pending = [];

@@ -2,6 +2,61 @@
 
 window.ListQuery = (() => {
   const resultParams = new Set(['snapshotId', 'page', 'pageSize']);
+  const activeSnapshots = new Set();
+  const downloads = new Map();
+  const pendingRetirement = new Set();
+
+  function retireSnapshots(ids, wait = false) {
+    const unused = ids.filter(id => {
+      if (!id) return false;
+      if (!downloads.has(id)) return true;
+      pendingRetirement.add(id);
+      return false;
+    });
+    if (!unused.length) return;
+    const url = '/api/list-snapshots/retire';
+    const json = JSON.stringify(unused);
+    if (wait && window.fetch) {
+      return window.fetch(url, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: json })
+        .catch(() => {});
+    }
+    window.navigator?.sendBeacon?.(url, new Blob([json], { type: 'application/json' }));
+  }
+
+  function snapshotOwner() {
+    let id;
+    let retiring;
+    return (next, wait) => {
+      if (id === next) return retiring;
+      if (id) {
+        activeSnapshots.delete(id);
+        const marked = retireSnapshots([id], wait);
+        if (marked) {
+          retiring = marked;
+          marked.then(() => { if (retiring === marked) retiring = undefined; });
+        }
+      }
+      id = next;
+      if (id) activeSnapshots.add(id);
+      return retiring;
+    };
+  }
+
+  function protectSnapshot(id) {
+    downloads.set(id, (downloads.get(id) ?? 0) + 1);
+    return () => {
+      const count = downloads.get(id);
+      if (count > 1) downloads.set(id, count - 1);
+      else {
+        downloads.delete(id);
+        if (pendingRetirement.delete(id)) retireSnapshots([id]);
+      }
+    };
+  }
+
+  window.addEventListener?.('pagehide', event => {
+    if (!event.persisted) retireSnapshots([...activeSnapshots]);
+  });
 
   function copyQuery(query) {
     return Object.fromEntries(Object.entries(query)
@@ -45,8 +100,9 @@ window.ListQuery = (() => {
     };
   }
 
-  function create({ defaults = {}, pageSize = 25, load, onChange = () => {} }) {
+  function create({ defaults = {}, pageSize = 25, load, onChange = () => {}, ownsSnapshot = true }) {
     const defaultQuery = copyQuery(defaults);
+    const keepSnapshot = ownsSnapshot ? snapshotOwner() : () => {};
     let draft = copyQuery(defaultQuery);
     let applied = copyQuery(defaultQuery);
     let status = 'idle';
@@ -67,7 +123,7 @@ window.ListQuery = (() => {
       };
     }
 
-    async function request(params) {
+    async function request(params, retirement) {
       const previous = pending;
       const controller = new AbortController();
       pending = controller;
@@ -77,8 +133,13 @@ window.ListQuery = (() => {
       onChange(getState());
 
       try {
-        const next = await load(params, { signal: controller.signal });
+        if (retirement) await retirement;
         if (pending !== controller) return;
+        const next = await load(params, { signal: controller.signal });
+        if (pending !== controller) {
+          if (ownsSnapshot && !params.snapshotId) retireSnapshots([next?.snapshotId]);
+          return;
+        }
         if (!Array.isArray(next?.items) || !Number.isSafeInteger(next.total) || next.total < 0 ||
             next.page !== params.page || !Number.isSafeInteger(next.pageSize) ||
             next.pageSize < 1 || typeof next.snapshotId !== 'string' || !next.snapshotId ||
@@ -92,6 +153,7 @@ window.ListQuery = (() => {
           throw new Error('Số bản ghi trả về không khớp với trang đang xem.');
         }
         result = structuredClone(next);
+        keepSnapshot(result.snapshotId);
         status = next.total ? 'ready' : 'empty';
       } catch (requestError) {
         if (pending !== controller) return;
@@ -108,7 +170,8 @@ window.ListQuery = (() => {
     function applyQuery(query) {
       applied = copyQuery(query);
       result = null;
-      return request({ ...copyQuery(applied), page: 1, ...(pageSize === null ? {} : { pageSize }) });
+      const params = { ...copyQuery(applied), page: 1, ...(pageSize === null ? {} : { pageSize }) };
+      return request(params, keepSnapshot(undefined, true));
     }
 
     return {
@@ -126,6 +189,7 @@ window.ListQuery = (() => {
         status = 'idle';
         error = null;
         result = null;
+        keepSnapshot(undefined, true);
         onChange(getState());
       },
       apply() { return applyQuery(draft); },
@@ -149,5 +213,5 @@ window.ListQuery = (() => {
     };
   }
 
-  return { create, loadFrom };
+  return { create, loadFrom, snapshotOwner, protectSnapshot, retireSnapshots };
 })();

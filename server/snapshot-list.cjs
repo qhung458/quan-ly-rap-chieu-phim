@@ -56,6 +56,7 @@ function createSnapshotList({ store, pool, scope, query, load, workbook, paginat
     } else {
       const selection = parseListQuery(filters, query);
       const snapshot = await withConsistentListRead(pool, connection => load(connection, selection, req));
+      if (res.destroyed) return;
       snapshotId = store.create({ ...snapshot, ...access });
     }
     if (paginated) return res.json(store.page(snapshotId, access, pagination));

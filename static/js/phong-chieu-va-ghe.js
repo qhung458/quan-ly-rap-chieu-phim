@@ -106,6 +106,15 @@
     return $row;
   }
 
+  function updateSelection($body, kind, code) {
+    const attribute = 'data-' + kind + '-id';
+    $body.children('tr[' + attribute + ']').each(function () {
+      const active = this.getAttribute(attribute) === code;
+      $(this).toggleClass('is-selected', active)
+        .find('.' + kind + '-selector').attr('aria-pressed', String(active));
+    });
+  }
+
   function renderRooms() {
     $roomRows.empty();
     $('#room-count').text(roomsLoading || roomsError ? '' : rooms.length + ' phòng');
@@ -148,7 +157,7 @@
     $roomSeatCount.val(room?.SoGhe ?? '');
     if (room) $('#room-type').val(room.LoaiPhong);
     $('#selected-room-label').text(room ? '— ' + room.MaPhong : '');
-    renderRooms();
+    updateSelection($roomRows, 'room', room?.MaPhong);
     syncControls();
   }
 
@@ -161,6 +170,7 @@
     $('#seat-row').val(seat?.SoHang ?? '');
     $('#seat-number').val(seat?.SoGhe ?? '');
     $('#seat-type').val(seat?.LoaiGhe ?? 'Thuong');
+    updateSelection($seatRows, 'seat', seat?.MaGhe);
     syncControls();
   }
 
@@ -325,7 +335,6 @@
     if (saving || seatsLoading || roomsLoading) return;
     showMessage($seatMessage, '');
     showSeat(seats.find(item => item.MaGhe === this.dataset.seatId));
-    renderSeats();
   });
 
   async function suggestRoomCode() {
@@ -408,7 +417,6 @@
     if (seatMode === 'add') return $seatForm[0].requestSubmit();
     showMessage($seatMessage, '');
     showSeat(null);
-    renderSeats();
     seatMode = 'add';
     $('#seat-id').attr('placeholder', 'Tự tạo khi lưu');
     syncControls();
@@ -426,7 +434,6 @@
   $('#clear-seat').on('click', () => {
     showMessage($seatMessage, '');
     showSeat(null);
-    renderSeats();
   });
 
   $seatForm.on('submit', event => {
