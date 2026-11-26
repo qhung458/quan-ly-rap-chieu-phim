@@ -39,6 +39,26 @@
   let detailLoading = false;
   let customerTimer;
 
+  const enableInvoiceExport = ExcelExport.bind('invoice-detail-export', () => {
+    const invoice = selectedInvoice;
+    return {
+      filename: 'hoa-don-' + invoice.MaHoaDon,
+      sheets: [{
+        name: 'Hóa đơn',
+        columns: [['Mã hóa đơn', 18], ['Mã khách', 16], ['Khách hàng', 28], ['Số điện thoại', 18],
+          ['Ngày mua', 22, ExcelExport.dateTime], ['Tổng số lượng', 16, ExcelExport.integer],
+          ['Tổng thanh toán', 20, ExcelExport.money]],
+        rows: [[invoice.MaHoaDon, invoice.MaKhachHang, invoice.TenKhachHang, invoice.SoDienThoai,
+          ExcelExport.asDate(invoice.NgayMua), invoice.SoLuong, invoice.TongTien]]
+      }, {
+        name: 'Chi tiết combo',
+        columns: [['Mã combo', 16], ['Combo', 32], ['Đơn giá', 18, ExcelExport.money],
+          ['Số lượng', 14, ExcelExport.integer], ['Thành tiền', 20, ExcelExport.money]],
+        rows: invoice.ChiTiet.map(line => [line.MaCombo, line.TenCombo, line.DonGia, line.SoLuong, line.ThanhTien])
+      }]
+    };
+  });
+
   function showError($message, xhr) {
     if (xhr.status === 401) {
       location.assign('dang-nhap.html');
@@ -202,6 +222,7 @@
     $('#invoice-submit').prop('disabled', !user || saving || !$customer.val() ||
       !$lines.children().length || $lines.find('.line-combo').toArray().some(select => !select.value));
     $deleteInvoice.prop('hidden', !selectedInvoice || !admin).prop('disabled', saving || detailLoading);
+    enableInvoiceExport(Boolean(user && selectedInvoice && !saving && !detailLoading));
   }
 
   /* ---------- Combo ---------- */
@@ -475,7 +496,7 @@
   function renderInvoices(rows) {
     $invoiceRows.empty();
     for (const row of rows) {
-      const active = row.MaHoaDon === selectedInvoice;
+      const active = row.MaHoaDon === selectedInvoice?.MaHoaDon;
       $invoiceRows.append($('<tr>').data('code', row.MaHoaDon).toggleClass('is-selected', active).append(
         $('<td>').append($('<button>', {
           type: 'button', class: 'customer-selector', text: row.MaHoaDon, 'aria-pressed': String(active)
@@ -489,10 +510,10 @@
   }
 
   function renderDetail(invoice, message = 'Chọn một hóa đơn để xem chi tiết.') {
-    selectedInvoice = invoice?.MaHoaDon ?? null;
+    selectedInvoice = invoice;
     const $detail = $('#invoice-detail').empty();
     $invoiceRows.find('tr').each(function () {
-      const active = $(this).data('code') === selectedInvoice;
+      const active = $(this).data('code') === selectedInvoice?.MaHoaDon;
       $(this).toggleClass('is-selected', active).find('.customer-selector').attr('aria-pressed', String(active));
     });
     syncButtons();
@@ -561,11 +582,12 @@
   });
 
   $deleteInvoice.on('click', async () => {
-    if (!selectedInvoice || saving || detailLoading || !window.confirm('Xóa hóa đơn ' + selectedInvoice + '?')) return;
+    const code = selectedInvoice?.MaHoaDon;
+    if (!code || saving || detailLoading || !window.confirm('Xóa hóa đơn ' + code + '?')) return;
     saving = true;
     syncButtons();
     try {
-      await $.ajax({ url: invoiceApi + '/' + encodeURIComponent(selectedInvoice), method: 'DELETE' });
+      await $.ajax({ url: invoiceApi + '/' + encodeURIComponent(code), method: 'DELETE' });
       detailVersion++;
       renderDetail(null);
       $invoiceMessage.removeClass('text-danger').text('Đã xóa hóa đơn.');

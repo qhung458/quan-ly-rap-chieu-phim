@@ -73,6 +73,7 @@ Sau khi đăng nhập, mở **Bán vé**, chọn phim rồi chọn một suất 
 
 - **Đổi vé** cho phép chọn ghế mới hoặc suất khác còn mở bán. Đổi ghế trong cùng suất giữ giá đã lưu. Đổi sang suất khác dùng giá của suất mới.
 - **Hủy vé** giữ bản ghi lịch sử và giải phóng ghế. Thời hạn bán, đổi và hủy lấy từ `CauHinhHeThong`, mặc định là 5 phút trước giờ chiếu để bán và 60 phút để đổi hoặc hủy.
+- **Xuất vé** tải Excel cho vé đang xem hoặc toàn bộ vé vừa lưu trong một lần bán nhiều ghế. Tệp có thông tin suất chiếu, ghế, giá đã lưu và trạng thái từng vé.
 - **Số ghế trống** cạnh sơ đồ lấy từ `fn_SoGheTrong` và được tải lại sau khi bán, đổi hoặc hủy vé. Ghế mới chọn vẫn được tính là trống cho đến khi lưu vé.
 - Schema cần có các quy tắc trong `sqlCode/create_trigger.sql`. Danh sách chọn chỉ hiện suất `SapChieu` còn thời hạn bán. Có thể xem vé của các suất đã qua trong lịch sử mua vé ở trang **Khách hàng**.
 - Quản trị viên có thể mở **Xem vé** tại **Quản lý suất chiếu** để tra cả suất đã qua hoặc đã hủy. Excel lấy toàn bộ vé khớp từ bản chốt đang xem theo đúng thứ tự, với mã vé, mã suất, ghế, ngày đặt, giá, trạng thái và mã khách.
@@ -84,6 +85,7 @@ Mở **Bắp nước và hóa đơn** trong thanh điều hướng. Nhân viên 
 - Bảng `DauHoaDon` lưu một khách cho mỗi mã hóa đơn. Bảng `HoaDon` lưu từng dòng combo và có khóa ngoại theo mã hóa đơn và mã khách. Mã hóa đơn tự tăng theo dạng `HD001`, `HD002`, … và ứng dụng giữ số đã cấp khi hóa đơn bị xóa.
 - Máy chủ tự tính `TongTien` = giá combo trong MySQL × số lượng. Đổi giá combo sau đó không làm thay đổi hóa đơn cũ.
 - Combo đã có trong hóa đơn không thể xóa (khóa ngoại). Hóa đơn nhập trùng combo được gộp số lượng.
+- Trong **Chi tiết hóa đơn**, chọn **Xuất hóa đơn** để tải Excel gồm thông tin của hóa đơn đang mở và từng dòng combo theo đơn giá lúc mua. Có thể xuất ngay sau khi lưu hóa đơn.
 - Khi chuyển dữ liệu hóa đơn cũ sang đầu chứng từ, ngày chứng từ lấy theo dòng có thời điểm mua sớm nhất. Danh sách hóa đơn phân trang. Excel Combo và Hóa đơn lấy đủ các bản ghi khớp theo đúng dữ liệu và thứ tự của lần áp dụng truy vấn đang xem.
 
 ## Thống kê

@@ -1,4 +1,4 @@
-/* global jQuery, ListQuery, ShowTicketList */
+/* global jQuery, ListQuery, ShowTicketList, ExcelExport */
 (() => {
   if (!window.jQuery) return;
 
@@ -38,8 +38,28 @@
   let selectedSeat = null;
   let selectedSeats = [];
   let selectedTicket = null;
+  let lastSale = null;
   let ticketRequest;
   let moving = false;
+
+  const enableTicketExport = ExcelExport.bind('export-ticket', () => {
+    const source = selectedTicket ? { tickets: [selectedTicket], show } : lastSale;
+    const { tickets, show: screening } = source;
+    const first = tickets[0].MaVe;
+    const last = tickets.at(-1).MaVe;
+    return {
+      filename: 've-' + (tickets.length > 1 ? `${first}-${last}` : first),
+      sheets: [{
+        name: 'Vé xem phim',
+        columns: [['Mã vé', 16], ['Phim', 32], ['Mã suất chiếu', 20], ['Bắt đầu', 22, ExcelExport.dateTime],
+          ['Phòng', 20], ['Ghế', 12], ['Mã khách', 16], ['Khách hàng', 28], ['Ngày đặt', 22, ExcelExport.dateTime],
+          ['Giá vé', 18, ExcelExport.money], ['Trạng thái', 18]],
+        rows: tickets.map(ticket => [ticket.MaVe, screening.TenPhim, ticket.MaSuatChieu,
+          ExcelExport.asDate(screening.BatDau), screening.TenPhong, seatLabel(ticket), ticket.MaKhachHang,
+          ticket.TenKhachHang, ExcelExport.asDate(ticket.NgayDat), Number(ticket.GiaVe), statusLabels[ticket.TrangThai]])
+      }]
+    };
+  });
 
   function showMessage(message, isError = false) {
     $message.toggleClass('text-danger', isError).text(message);
@@ -265,6 +285,7 @@
     $('#save-ticket').text(moving ? 'Lưu đổi' : 'Lưu vé')
       .prop('disabled', !active || !show.CoTheBan || viewing || !hasSeatSelection || !canSave);
     $('#move-ticket, #cancel-ticket').prop('disabled', !canChange);
+    enableTicketExport(!loading && !saving && !ticketRequest && !moving && Boolean(viewing ? show : lastSale));
     $('#clear-ticket').text(moving ? 'Bỏ đổi' : 'Làm mới')
       .prop('disabled', !ready || saving || (!moving && !$show.val()));
     $('#logout-button').prop('disabled', saving);
@@ -274,6 +295,7 @@
   function clearSelection() {
     cancelTicketLookup();
     selectedTicket = null;
+    lastSale = null;
     selectedSeat = null;
     selectedSeats = [];
     moving = false;
@@ -306,6 +328,7 @@
         selectedTicket = current;
       }
       if (pick) {
+        lastSale = null;
         selectedSeat = null;
         selectedSeats = [];
       }
@@ -461,6 +484,7 @@
         url: api, method: 'POST', contentType: 'application/json', data: JSON.stringify(payload)
       });
       const savedTickets = Array.isArray(result) ? result : [result];
+      lastSale = { tickets: savedTickets, show };
       selectedTicket = null;
       selectedSeat = null;
       selectedSeats = [];
@@ -542,6 +566,7 @@
     const seat = $(this).data('seat');
     if (seat.DaCoVe) return;
     if (selectedTicket && !moving) clearSelection();
+    lastSale = null;
     if (moving) {
       selectedSeat = selectedSeat?.MaGhe === seat.MaGhe ? null : seat;
     } else {

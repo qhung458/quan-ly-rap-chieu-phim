@@ -179,6 +179,7 @@
                 >
                   Lưu vé
                 </button>
+                <button class="btn btn-outline-dark btn-sm" id="export-ticket" type="button" title="Tải vé dạng Excel" disabled>Xuất vé</button>
                 <button
                   class="btn btn-outline-dark btn-sm"
                   id="move-ticket"
@@ -204,6 +205,7 @@
                   Làm mới
                 </button>
               </div>
+              <p class="form-message" id="export-ticket-message" role="status"></p>
             </form>
         </section>
         <section class="panel ticket-list" aria-labelledby="tickets-title">
@@ -220,6 +222,7 @@
       crossorigin="anonymous"
     ></script>
     <script src="../js/truy-van-danh-sach.js"></script>
+    <script src="../js/xuat-excel.js"></script>
     <script src="../js/ve-theo-suat.js"></script>
     <script src="../js/ban-ve.js"></script>
   </body>

@@ -306,6 +306,7 @@ function excelBrowser(fetch, ExcelJS) {
   const clickHandlers = [];
   const button = {
     disabled: true,
+    textContent: 'Xuất Excel',
     addEventListener(type, listener) {
       assert.equal(type, 'click');
       clickHandlers.push(listener);
@@ -412,11 +413,12 @@ test('server Excel download reports authentication, permission and expiration wi
   }
 });
 
-test('the legacy client-side Excel binder still creates a readable workbook with ordered rows', async () => {
+test('the client-side Excel binder creates a readable workbook and restores the custom button label', async () => {
   const ExcelJS = require('exceljs');
   const { ExcelExport, button, message, downloads } = excelBrowser(
-    () => assert.fail('legacy path must not call fetch'), ExcelJS
+    () => assert.fail('client-side export must not call fetch'), ExcelJS
   );
+  button.textContent = 'Xuất hóa đơn';
   const enable = ExcelExport.bind('export', async () => ({
     filename: 'hien-tai',
     sheets: [{ name: 'Khách', columns: [['Mã', 16], ['Số điện thoại', 20]], rows: [['KH02', '0901234567'], ['KH01', '0911234567']] }]
@@ -434,4 +436,5 @@ test('the legacy client-side Excel binder still creates a readable workbook with
     ['KH02', '0901234567'], ['KH01', '0911234567']
   ]);
   assert.match(message.textContent, /Đã gửi/);
+  assert.equal(button.textContent, 'Xuất hóa đơn');
 });

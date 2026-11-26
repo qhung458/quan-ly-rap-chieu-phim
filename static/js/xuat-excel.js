@@ -110,6 +110,7 @@ window.ExcelExport = (() => {
   function bindAction(id, run) {
     const button = document.getElementById(id);
     const message = document.getElementById(id + '-message');
+    const label = button.textContent;
     let available = false;
     let busy = false;
     let revision = 0;
@@ -133,7 +134,7 @@ window.ExcelExport = (() => {
       } finally {
         busy = false;
         button.disabled = !available;
-        button.textContent = 'Xuất Excel';
+        button.textContent = label;
       }
     });
 
