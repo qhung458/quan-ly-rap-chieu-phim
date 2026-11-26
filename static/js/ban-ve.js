@@ -14,6 +14,7 @@
   const $customerMessage = $('#ticket-customer-search-status');
   const $customerMore = $('#ticket-customer-more');
   const $seatMap = $('#seat-map');
+  const $seatAvailability = $('#seat-availability');
   const $message = $('#ticket-message');
   const ticketList = ShowTicketList.mount(document.getElementById('ticket-list-content'), { onSelect: selectTicket });
   const lookupCustomers = ListQuery.loadFrom('/api/khach-hang/tuy-chon');
@@ -355,6 +356,7 @@
   function clearShowDetails(seatMessage) {
     show = null;
     seats = [];
+    $seatAvailability.empty();
     renderSeatMap(seatMessage);
     renderSelection();
   }
@@ -387,6 +389,7 @@
 
       show = detail.suatChieu;
       seats = detail.ghe;
+      $seatAvailability.text('Số ghế trống: ' + show.SoGheTrong);
       if (selectedSeat) {
         const code = selectedSeat.MaGhe;
         selectedSeat = seats.find(seat => seat.MaGhe === code && !seat.DaCoVe) ?? null;

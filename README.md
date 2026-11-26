@@ -20,12 +20,12 @@ USE quan_ly_rap_chieu_phim;
 3. `create_trigger.sql` tạo cấu hình thời hạn bán, đổi, hủy vé và các trigger kiểm tra vé, ghế, lịch chiếu.
 4. `create_tai_khoan.sql` tạo bảng tài khoản để đăng ký và đăng nhập.
 5. `create_procedure.sql` tạo thủ tục tìm suất chiếu theo phim và ngày.
-6. `create_function.sql` tạo hàm đếm số ghế trống. Hai bước cuối cần khi sử dụng thủ tục và hàm trực tiếp trong SQL.
+6. `create_function.sql` tạo hàm `fn_SoGheTrong` mà trang **Bán vé** dùng để hiển thị số ghế trống của suất được chọn.
 
 ### Nâng cấp schema đã có dữ liệu
 
 1. Dừng ứng dụng và chọn đúng schema đang dùng. Với cơ sở dữ liệu cũ còn lưu hóa đơn theo từng dòng trong `HoaDon`, chạy `migrate_invoice_headers.sql` nếu phần đầu hóa đơn hoặc dãy mã chưa được cài. Script lấy ngày chứng từ từ dòng mua sớm nhất, tạo một đầu chứng từ cho mỗi mã và giữ nguyên các dòng hóa đơn.
-2. Cài các thành phần còn thiếu theo thứ tự. Chạy `create_trigger.sql` cho cấu hình và quy tắc bán vé, rồi `create_tai_khoan.sql` nếu chưa có bảng tài khoản. Việc bổ sung thủ tục và hàm SQL theo bước 5–6 ở trên.
+2. Cài các thành phần còn thiếu theo thứ tự. Chạy `create_trigger.sql` cho cấu hình và quy tắc bán vé, rồi `create_tai_khoan.sql` nếu chưa có bảng tài khoản. Chạy `create_function.sql` nếu schema chưa có hàm `fn_SoGheTrong`.
 
 Các file `createTable.sql` và `addSample.sql` dành cho khởi tạo schema mới.
 
@@ -73,6 +73,7 @@ Sau khi đăng nhập, mở **Bán vé**, chọn phim rồi chọn một suất 
 
 - **Đổi vé** cho phép chọn ghế mới hoặc suất khác còn mở bán. Đổi ghế trong cùng suất giữ giá đã lưu. Đổi sang suất khác dùng giá của suất mới.
 - **Hủy vé** giữ bản ghi lịch sử và giải phóng ghế. Thời hạn bán, đổi và hủy lấy từ `CauHinhHeThong`, mặc định là 5 phút trước giờ chiếu để bán và 60 phút để đổi hoặc hủy.
+- **Số ghế trống** cạnh sơ đồ lấy từ `fn_SoGheTrong` và được tải lại sau khi bán, đổi hoặc hủy vé. Ghế mới chọn vẫn được tính là trống cho đến khi lưu vé.
 - Schema cần có các quy tắc trong `sqlCode/create_trigger.sql`. Danh sách chọn chỉ hiện suất `SapChieu` còn thời hạn bán. Có thể xem vé của các suất đã qua trong lịch sử mua vé ở trang **Khách hàng**.
 - Quản trị viên có thể mở **Xem vé** tại **Quản lý suất chiếu** để tra cả suất đã qua hoặc đã hủy. Excel lấy toàn bộ vé khớp từ bản chốt đang xem theo đúng thứ tự, với mã vé, mã suất, ghế, ngày đặt, giá, trạng thái và mã khách.
 

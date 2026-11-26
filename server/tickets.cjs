@@ -12,11 +12,11 @@ router.use(requireLogin);
 const maxSeatsPerSale = 130;
 const statusLabels = { DaDat: 'Đã đặt', DaSuDung: 'Đã sử dụng', DaHuy: 'Đã hủy' };
 
-const showQuery = `
+const showQuery = (includeSeatCount = false) => `
   SELECT sc.MaSuatChieu, p.MaPhim, p.TenPhim, sc.MaPhong, pc.TenPhong, sc.GiaVe, sc.TrangThai,
          DATE_FORMAT(TIMESTAMP(sc.NgayChieu, sc.GioBatDau), '%d/%m/%Y %H:%i') AS BatDau,
          TIMESTAMPDIFF(SECOND, NOW(), TIMESTAMP(sc.NgayChieu, sc.GioBatDau)) AS GiayDenGioChieu,
-         c.PhutNgungBan, c.PhutNgungHuy
+         c.PhutNgungBan, c.PhutNgungHuy${includeSeatCount ? ', fn_SoGheTrong(sc.MaSuatChieu) AS SoGheTrong' : ''}
   FROM SuatChieu sc
   JOIN Phim p ON p.MaPhim = sc.MaPhim
   JOIN PhongChieu pc ON pc.MaPhong = sc.MaPhong
@@ -178,14 +178,14 @@ const ticketList = createSnapshotList({
 });
 
 router.get('/suat-chieu', async (_req, res) => {
-  const [rows] = await db.query(`${showQuery} ORDER BY sc.NgayChieu, sc.GioBatDau, sc.MaSuatChieu`);
+  const [rows] = await db.query(`${showQuery()} ORDER BY sc.NgayChieu, sc.GioBatDau, sc.MaSuatChieu`);
   res.json(rows.map(showPermissions).filter(show => show.CoTheBan));
 });
 
 router.get('/suat-chieu/:showCode', async (req, res) => {
   const code = readCode(req.params.showCode, 20);
   const detail = await transaction(async connection => {
-    const [[show]] = await connection.execute(`${showQuery} WHERE sc.MaSuatChieu = ?`, [code]);
+    const [[show]] = await connection.execute(`${showQuery(true)} WHERE sc.MaSuatChieu = ?`, [code]);
     if (!show) throw new TicketError(404, 'Không tìm thấy suất chiếu.');
     const [seats] = await connection.execute(`
       SELECT g.MaGhe, g.SoHang, g.SoGhe, g.LoaiGhe, v.MaGheChiemCho IS NOT NULL AS DaCoVe

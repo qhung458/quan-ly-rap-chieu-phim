@@ -54,6 +54,10 @@ async function installTicketRules(db) {
   const [commands] = routines.split(/^DELIMITER ;\r?$/m);
   await db.query(setup);
   for (const statement of commands.split('//').map(part => part.trim()).filter(Boolean)) await db.query(statement);
+
+  const [dropFunction, createFunction] = sql('create_function.sql').split(/^DELIMITER (?:\$\$|;)\r?$/m);
+  await db.query(dropFunction);
+  await db.query(createFunction.trim().replace(/\$\$$/, ''));
 }
 
 async function insertTickets(db, rows) {
@@ -153,7 +157,11 @@ test('Ticket lists, administrator Excel, and sale/move/cancel use the real MySQL
         const old = await json(request, show('SHOW_PAST'), { cookie: staffCookie });
         assert.equal(old.suatChieu.CoTheBan, false);
         assert.equal(old.suatChieu.CoTheHuyDoi, false);
+        assert.equal(old.suatChieu.SoGheTrong, 41);
         assert.deepEqual(Object.keys(old).sort(), ['ghe', 'suatChieu']);
+        const cancelled = await json(request, show('SHOW_CANCELLED'), { cookie: staffCookie });
+        assert.equal(cancelled.suatChieu.SoGheTrong, 0);
+        await json(request, show('MISSING'), { cookie: staffCookie }, 404);
         const selectedCustomer = await json(request, '/api/khach-hang/tuy-chon', { cookie: staffCookie, query: { q: '  dang   muller  ', pageSize: 1 } });
         assert.deepEqual([selectedCustomer.total, selectedCustomer.items[0].MaKhachHang], [2, 'K001']);
       });
@@ -204,6 +212,7 @@ test('Ticket lists, administrator Excel, and sale/move/cancel use the real MySQL
         assert.equal(activeOnly.TrangThai, 'DaDat');
         const seats = await json(request, show('SHOW_OPEN'), { cookie: staffCookie });
         assert.equal(seats.ghe.length, 60);
+        assert.equal(seats.suatChieu.SoGheTrong, 59);
         assert.ok(findSeat(seats, 'G001'));
         assert.equal(seats.suatChieu.CoTheBan, true);
         const noMatch = await json(request, route, { cookie: staffCookie, query: { maVe: 'CANCEL', maVeMode: 'exact' } });
@@ -246,6 +255,7 @@ test('Ticket lists, administrator Excel, and sale/move/cancel use the real MySQL
         const sold = await json(request, api, purchase('SHOW_OPEN', ['G038', 'G039']), 201);
         assert.equal(sold.length, 2);
         assert.deepEqual(sold.map(row => row.MaGhe), ['G038', 'G039']);
+        assert.equal((await json(request, show('SHOW_OPEN'), { cookie: staffCookie })).suatChieu.SoGheTrong, 57);
         const move = (old, code, seat) => json(request, api + '/doi', { cookie: staffCookie, method: 'PUT', data: {
           Ve: reference(old), MaSuatChieu: code, MaGhe: seat
         } });
@@ -253,6 +263,7 @@ test('Ticket lists, administrator Excel, and sale/move/cancel use the real MySQL
         assert.equal(Number(sameShow.GiaVe), 90000);
         await detail(request, staffCookie, sold[0], 404);
         const sameMap = await json(request, show('SHOW_OPEN'), { cookie: staffCookie });
+        assert.equal(sameMap.suatChieu.SoGheTrong, 57);
         assert.equal(findSeat(sameMap, 'G038'), false);
         assert.equal(findSeat(sameMap, 'G040'), true);
         const anotherShow = await move(sameShow, 'SHOW_NEXT', 'G041');
@@ -261,11 +272,17 @@ test('Ticket lists, administrator Excel, and sale/move/cancel use the real MySQL
         assert.equal(Number(anotherShow.GiaVe), 110000);
         await detail(request, staffCookie, sameShow, 404);
         assert.deepEqual(key(await detail(request, staffCookie, anotherShow)), key(anotherShow));
-        assert.equal(findSeat(await json(request, show('SHOW_OPEN'), { cookie: staffCookie }), 'G040'), false);
-        assert.equal(findSeat(await json(request, show('SHOW_NEXT'), { cookie: staffCookie }), 'G041'), true);
+        const sourceMap = await json(request, show('SHOW_OPEN'), { cookie: staffCookie });
+        const destinationMap = await json(request, show('SHOW_NEXT'), { cookie: staffCookie });
+        assert.equal(sourceMap.suatChieu.SoGheTrong, 58);
+        assert.equal(findSeat(sourceMap, 'G040'), false);
+        assert.equal(destinationMap.suatChieu.SoGheTrong, 59);
+        assert.equal(findSeat(destinationMap, 'G041'), true);
         const cancelled = await json(request, api + '/huy', { cookie: staffCookie, method: 'PUT', data: { Ve: reference(anotherShow) } });
         assert.equal(cancelled.TrangThai, 'DaHuy');
-        assert.equal(findSeat(await json(request, show('SHOW_NEXT'), { cookie: staffCookie }), 'G041'), false);
+        const cancelledMap = await json(request, show('SHOW_NEXT'), { cookie: staffCookie });
+        assert.equal(cancelledMap.suatChieu.SoGheTrong, 60);
+        assert.equal(findSeat(cancelledMap, 'G041'), false);
         assert.equal((await detail(request, staffCookie, anotherShow)).TrangThai, 'DaHuy');
       });
     });

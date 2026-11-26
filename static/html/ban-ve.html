@@ -47,7 +47,10 @@
       </p>
       <div class="ticket-layout">
         <section class="panel seat-panel" aria-labelledby="seats-title">
-          <h2 id="seats-title">Chọn ghế <span id="seat-show"></span></h2>
+          <div class="d-flex flex-wrap align-items-baseline justify-content-between gap-2 mb-3">
+            <h2 class="mb-0" id="seats-title">Chọn ghế <span id="seat-show"></span></h2>
+            <p class="small text-secondary fw-semibold mb-0" id="seat-availability" role="status" aria-atomic="true"></p>
+          </div>
           <div class="seat-screen">Màn hình</div>
           <div class="seat-scroll">
             <div
